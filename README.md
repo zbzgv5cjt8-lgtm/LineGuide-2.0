@@ -1,16 +1,23 @@
-# LineGuide — v2.3 relevant-choice procedure builder
+# LineGuide — v2.4 dependent asset choices and conditional isolation
 
 This release builds on the stability fixes and introduces short, relevant pick-lists with an **Other — enter your own** option. It does **not** implement the distinct document templates or major/minor revision model yet. Those are recorded in `DESIGN_AND_PHASES.md` and will be implemented after Phase 1 is accepted.
 
-## Version 2.3 — curated dropdowns and Other
+## Version 2.4 — site/line selection, navigation and isolation
 
-- Keep menus short: a few common choices for task type, audience, prerequisites, hazards, PPE, step type and verification method.
-- Pick **Other — enter your own** when an answer is not in the list. This reveals an entry field; it does not permanently clutter the standard lists.
-- For hazards, prerequisites and PPE, open the checklist, tick **Other**, and enter custom items **one per line**. All custom items are included in the document.
-- Existing site / line / asset options remain available, with cascading selections and an Other entry when required.
-- Fixed document types (SOP, Work Instruction, Inspection Procedure) and status values (Draft, In review, Approved) deliberately have no Other option: they are controlled system classifications.
-- Technical actions, unique acceptance criteria, safe-state references and warnings stay as free text. The engineer must enter and check the machine-specific wording.
-- See `CHANGELOG.md` and `TEST_V23.md` for details and verification tests.
+- **Cascading equipment lists:** choose a site to see only its known production lines; choose the line to see only assets from that exact site and line. Changing a parent clears incompatible child choices. Sites, lines and assets entered through **Other** work as well. Existing options come from saved procedures; a separate asset master list is not yet implemented.
+- **Stage navigation:** Next and Back return the screen to the top of the newly displayed stage, including on mobile-size screens.
+- **Isolation is conditional:** every procedure must explicitly identify whether isolation is **required**, **not required for this procedure**, or whether **other task-specific safe-state arrangements** apply. A reference is mandatory only for required/other choices. A supporting explanation or approved operating reference is recommended for the no-isolation choice, such as a routine line start-up. No isolation selection is prefilled for new procedures.
+- **Document output:** the selected isolation status and relevant text appear clearly in preview/printed PDF. Switching to not required ensures old isolation text is not mistakenly exported as a current isolation instruction.
+- **Backward compatibility:** existing v2.3 procedures retain their saved isolation text, with a legacy-classification warning in previews until revised. Stored browser keys and JSON backup format are unchanged.
+- **Important safety boundary:** a choice of “not required” is not a finding that work is safe without isolation. Machine intervention may still require isolation and control of stored energy. Always use approved site/OEM procedures, risk assessments and competent review.
+
+`TEST_V24.md` contains a targeted manual test plan. `test_v24.py` is an optional automated Chromium/Playwright regression test.
+
+### Curated choices retained from v2.3
+
+- Keep menus short: common task types, audiences, prerequisites, hazards, PPE, step types and verification methods.
+- Use **Other — enter your own** for site/line/asset and other configurable answers. Multiple custom hazard, PPE and prerequisite items can be entered one per line.
+- Document status and types remain controlled classifications. Site-specific methods, warnings, acceptance criteria and references stay authored and verified by a competent user.
 
 ## Before replacing the current app
 
@@ -21,12 +28,12 @@ This release builds on the stability fixes and introduces short, relevant pick-l
 
 ## Update the existing GitHub Pages deployment
 
-1. Download and unzip the LineGuide v2.3 ZIP.
+1. If updating manually, download and unzip the LineGuide v2.4 ZIP. (When the files are pushed to GitHub for you, no ZIP upload is necessary.)
 2. Sign in to GitHub and open your **LineGuide-2.0** repository.
 3. Upload the files **inside** the `lineguide_mvp` folder to the **repository root** (where the existing `index.html` is), replacing the existing `index.html`, `app.js`, `sw.js` and `manifest.json`. Do not upload only the ZIP or put them in a new nested folder. The extra Markdown documents can be uploaded too, but are not required to run the app.
 4. Commit the changed files. You don't need to create a new repository or change GitHub Pages settings.
 5. Wait for GitHub Pages to finish deploying. Open your **existing** LineGuide URL in Safari, connected to the internet, and refresh. If old content remains, refresh again after a short wait so the updated service worker can take over. Do **not** clear website storage to force an update.
-6. On the Home screen within LineGuide, look for the text **“Relevant-choice build v2.3”**. That confirms the new HTML/JavaScript was loaded.
+6. On the Home screen within LineGuide, look for the text **“Workflow build v2.4”**. That confirms the new HTML/JavaScript was loaded.
 7. Run the checklist in `PHASE1_TEST_CHECKLIST.md` with fictional data first.
 
 ## What changed
