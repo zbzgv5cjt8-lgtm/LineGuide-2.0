@@ -451,8 +451,13 @@ def test_import_malformed_json_keeps_records(app):
  before=getdata(pg)
  with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import]').click()
  chooser.value.set_files({'name':'invalid.json','mimeType':'application/json','buffer':b'{"app":"LineGuide","version":1,"procedures":[{"id":null}]}'})
- assert getdata(pg)==before
+ # FileChooser selection returns before the asynchronous File.text()/validation finishes.
+ # Wait for the rejection dialog, rather than racing the browser event loop.
+ for _ in range(40):
+  if any('Import cancelled' in msg for msg in dialogs):break
+  pg.wait_for_timeout(100)
  assert any('Import cancelled' in msg for msg in dialogs)
+ assert getdata(pg)==before
  assert not errors
 
 @pytest.mark.group4
