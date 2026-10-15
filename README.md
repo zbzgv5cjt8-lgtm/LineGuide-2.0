@@ -1,3 +1,5 @@
+# LineGuide v2.5: SOP + SWP, quick Delete, separate heat/sharp hazards. See CHANGELOG.md and POC_REPORT.md.
+
 # LineGuide — v2.4 dependent asset choices and conditional isolation
 
 This release builds on the stability fixes and introduces short, relevant pick-lists with an **Other — enter your own** option. It does **not** implement the distinct document templates or major/minor revision model yet. Those are recorded in `DESIGN_AND_PHASES.md` and will be implemented after Phase 1 is accepted.
