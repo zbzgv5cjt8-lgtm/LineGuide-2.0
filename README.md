@@ -47,3 +47,16 @@ This release improves reliability of the existing personal-use prototype. It doe
 ## Technical summary
 
 Static HTML / CSS / JavaScript application with a service worker for offline shell caching, localStorage for prototype data, JSON backup and import, and browser print-to-PDF. Four runtime files: `index.html`, `app.js`, `manifest.json`, `sw.js`. Serve with GitHub Pages over HTTPS for normal iPhone testing. `index.html` can be opened locally for a rough browser preview but has restricted storage/offline capabilities depending on browser.
+
+
+## Version 2.2 — quick-select authoring
+
+- Document type: SOP, work instruction or inspection procedure drop-down (document-specific templates are planned for a later phase).
+- Existing sites, production lines and assets appear in drop-downs, filtered by their parent where relevant; choose **Add new / other** to create a new value.
+- Task type, audience and named people use selection lists with a custom-entry option.
+- Prerequisites, hazards and PPE use expandable multi-choice checklists; required machine-specific details remain free-text.
+- Step category and verification approach are selectable; unique actions, expected results, and warning details remain free-text.
+- Existing records, local storage key and v1 JSON backup compatibility are preserved.
+- **Selecting a procedure type does not yet produce a different full template.** That belongs to the guided-template phase.
+
+Always use fictional example procedures in publicly hosted prototype testing. Checklists are prompts, not safety certification.
