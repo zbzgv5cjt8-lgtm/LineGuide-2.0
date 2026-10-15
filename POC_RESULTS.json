@@ -1,0 +1,61 @@
+[
+  {
+    "scenario": "POC 01 \u2014 Routine line start-up",
+    "template": "Standard operating procedure (SOP)",
+    "isolation": "not-required",
+    "hazards": [
+      "Moving parts / entrapment",
+      "Noise"
+    ],
+    "steps": 2,
+    "result": "PASS"
+  },
+  {
+    "scenario": "POC 02 \u2014 Mechanical maintenance",
+    "template": "Safe working procedure (SWP)",
+    "isolation": "required",
+    "hazards": [
+      "Moving parts / entrapment",
+      "Sharp edges / surfaces"
+    ],
+    "steps": 2,
+    "result": "PASS"
+  },
+  {
+    "scenario": "POC 03 \u2014 Hot surface inspection",
+    "template": "Safe working procedure (SWP)",
+    "isolation": "other",
+    "hazards": [
+      "Hot surfaces"
+    ],
+    "steps": 1,
+    "result": "PASS"
+  },
+  {
+    "scenario": "POC 04 \u2014 Routine check with custom hazard",
+    "template": "Standard operating procedure (SOP)",
+    "isolation": "not-required",
+    "hazards": [
+      "Electrical",
+      "reflected optical emission"
+    ],
+    "steps": 1,
+    "result": "PASS"
+  },
+  {
+    "scenario": "Edit existing procedure and retain previous revision snapshot",
+    "result": "PASS"
+  },
+  {
+    "scenario": "Delete from filtered library without opening builder",
+    "result": "PASS"
+  },
+  {
+    "scenario": "Distinct hot and sharp hazard choices",
+    "result": "PASS"
+  },
+  {
+    "scenario": "No browser JavaScript errors",
+    "result": "PASS"
+  }
+]
