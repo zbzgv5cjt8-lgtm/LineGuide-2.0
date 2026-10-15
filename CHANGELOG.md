@@ -15,3 +15,16 @@
 ## v2.1 — Phase 1 stability
 
 - Stabilised procedure creation, storage transactions, data recovery and revision snapshots.
+
+## v2.3 — Relevant choices + Other
+
+- Shortened task-type, audience, prerequisite, PPE, hazard, instruction-category and verification menus to the most commonly relevant choices.
+- Every configurable selection now includes **Other — enter your own**. This reveals a text field only when needed.
+- Prerequisite, PPE and hazard checklists accept multiple custom answers, one per line; answers are stored and printed as selected items.
+- Existing procedures containing older option names remain readable and editable, including prior custom hazard or PPE entries.
+- Returning to earlier wizard pages preserves selections and custom answers.
+- A selected Other choice without an actual answer blocks proceeding, preventing a vague placeholder appearing in saved documents.
+- Custom values for task type and intended audience can be reused without crowding the menu with every historical value (at most three additional suggestions).
+- Unique task instructions, safe-state references, acceptance criteria and actual warning text remain editable and must be verified against approved sources.
+
+**No change to the stored-data key or backup format.** This is still a local-only prototype with named-but-unauthenticated approvals. Separate procedure templates and major/minor revision numbers remain future phases.
