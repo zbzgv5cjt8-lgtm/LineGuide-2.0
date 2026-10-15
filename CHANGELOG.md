@@ -1,11 +1,15 @@
-# LineGuide v2.5 — SOP / SWP proof of concept
+# LineGuide change log
 
-- Template choices are now **Standard operating procedure (SOP)** and **Safe working procedure (SWP)** only. Older procedures remain readable; editing an older template requires choosing SOP or SWP.
-- Hot surfaces and sharp edges / surfaces are independent hazard selections. The old combined label is preselected as both when editing, so users can refine it. Historical documents are not silently rewritten.
-- Delete is available directly on procedure cards in the Home and Library views, in addition to the detail view. Confirmation describes permanent loss of all revision history. Save errors do not remove records.
-- Offline application cache bumped to v2.5.
-- Includes independent proof-of-concept browser test scenarios and four clearly fictional, unapproved example procedures in a **separate opt-in import JSON**. These are not automatically added to your live library.
+## v2.6 — Quality and minimum-documentation release (15 Oct 2026)
 
-## Known limits
+- Implemented **SWP risk assessment choice**: approved existing reference plus task-specific controls, or a guided task-specific risk assessment with hazards, harm, exposed people and approved controls.
+- Rebuilt SOP/SWP preview and A4 PDF presentation: consistent document identity, concise sections, numbered steps, compact printable layout, clearly labelled unapproved status, optional fields omitted if empty.
+- Implemented major/minor revision numbering (1.0 → 1.1 or 2.0), stable human-readable document references and archived revision snapshots.
+- Improved search to include instruction content, document references, hazards and assessment details.
+- Added recoverable unfinished wizard drafts (stored locally while typing).
+- Prevented document reference reuse following routine deletion by retaining a local sequence counter, including it in backup/restore.
+- Improved photo upload: compress images locally for easier camera use and reduced browser storage consumption.
+- Fixed preview opening at a previous page's scroll position and step-number wrapping on narrow screens.
+- Added 24 repeatable browser tests and GitHub Actions checks on future updates; created QA evidence and a known-limitations log.
 
-Local browser storage, no authenticated approvals, major/minor numbering planned but not yet implemented (current code increments integer revisions), and printer-driven Save as PDF. Deleting an approved record is permanent and should be reserved for a personal prototype; production document control should use archive/withdrawal with an audit log instead.
+**Important:** These changes do not turn the prototype into a secure, authenticated controlled-document system or remove the need for competent review. The iPhone and offline behaviour remain to be verified in real use.
