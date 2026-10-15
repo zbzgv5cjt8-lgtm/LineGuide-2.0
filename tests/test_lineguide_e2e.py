@@ -511,8 +511,6 @@ def test_pdf_button_exports_real_searchable_pdf_repeated(app):
         assert download.suggested_filename.startswith('LineGuide-')
         assert download.suggested_filename.endswith('.pdf')
         doc = fitz.open(download.path())
-        if attempt == 0:
-            Path('/mnt/data/lineguide_print_fix/export_sample_swp.pdf').write_bytes(Path(download.path()).read_bytes())
         assert len(doc)>=1
         text = '\n'.join(x.get_text() for x in doc)
         for fragment in ['Reliable offline PDF','LG-SWP-0001','Purpose and scope','Working instructions','Document control','Fictional approved RA-TEST-01']:
