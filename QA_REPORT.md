@@ -55,3 +55,19 @@
 - Conduct an expert safety/document-control review before any workplace deployment.
 
 **Do not describe LineGuide as flawless or operationally approved based on this report.**
+
+
+## v2.7 — iPhone PDF export reliability (15 October 2026)
+
+Issue: the former **Print / Save PDF** button called `window.print()` directly. On installed iPhone standalone web apps (especially reported on iOS 27), this may do nothing. A failed action offered no downloadable document or recovery instructions.
+
+Resolution:
+- Added standalone `pdf-export.js` with searchable, vector-text A4 PDF generation and embedded local JPEG photos; no web-service dependencies.
+- **Save / Share PDF** creates a file for the selected document revision. On capable mobile browsers, native sharing allows **Save to Files** and **Print**. On browsers without file sharing, a standard file download is started.
+- Optional **Print in Safari** is only offered in browser tabs, not standalone app mode.
+- Page numbering, explicit draft/archived warnings, risk assessment, verification, and authorship information retained in PDF.
+- Legacy PNG pictures that have loaded in the preview can be converted to embedded JPEG on device. If a picture cannot be decoded, the PDF displays an explicit missing-photo warning instead of silently omitting it.
+- Common technical symbols mapped to unambiguous equivalents when the built-in PDF font cannot represent them; unexpected symbols block export with a clear error instead of silently corrupting technical meaning.
+- Added 10 automated browser/PDF tests, including repeated export, mobile standalone fallback, normal browser printing, native sharing, old revisions, JPEG photo, PNG photo, multipage layout, technical notation, and rejected symbols. Total **34** browser checks.
+
+Release acceptance: passes Chromium/browser tests and generates a searchable PDF that can be opened and inspected with an independent PDF reader. **Not yet proven on a physical iPhone or iOS native Share sheet.** This has to be checked by the user. Browser test automation cannot replicate platform bugs in iOS 27's PWA print handling.

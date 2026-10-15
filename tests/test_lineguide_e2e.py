@@ -38,6 +38,7 @@ def app(browser):
  page.set_content(html)
  page.evaluate("""() => {const store={};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>delete store[k]}})}""")
  page.add_script_tag(content=(ROOT/'app.js').read_text())
+ page.add_script_tag(content=(ROOT/'pdf-export.js').read_text())
  yield page,ctx,errors,dialogs
  ctx.close()
 
@@ -495,3 +496,173 @@ def test_large_camera_photo_is_accepted_after_compression(app):
  photo=pg.locator('[data-step=photo]').input_value()
  assert photo.startswith('data:image/jpeg;base64,') and len(photo)<950000
  assert not errors
+
+
+# Reliable native PDF export regression suite (iPhone print fallback).
+import fitz
+@pytest.mark.group1
+def test_pdf_button_exports_real_searchable_pdf_repeated(app):
+    page, _, errors, _ = app
+    prepare_one(page,'Reliable offline PDF',swp=True)
+    for attempt in range(2):
+        with page.expect_download() as info:
+            page.locator('[data-action=save-pdf]').click()
+        download = info.value
+        assert download.suggested_filename.startswith('LineGuide-')
+        assert download.suggested_filename.endswith('.pdf')
+        doc = fitz.open(download.path())
+        if attempt == 0:
+            Path('/mnt/data/lineguide_print_fix/export_sample_swp.pdf').write_bytes(Path(download.path()).read_bytes())
+        assert len(doc)>=1
+        text = '\n'.join(x.get_text() for x in doc)
+        for fragment in ['Reliable offline PDF','LG-SWP-0001','Purpose and scope','Working instructions','Document control','Fictional approved RA-TEST-01']:
+            assert fragment in text, (fragment, text)
+        assert 'DRAFT / UNAPPROVED' in text
+    assert not errors
+
+@pytest.mark.group2
+def test_pdf_browser_print_not_called_in_standalone_mode(app):
+    page, _, errors, dialogs=app
+    prepare_one(page,'Standalone print check')
+    page.evaluate("""() => {
+        window.__printCalls=0;
+        window.print=()=>window.__printCalls++;
+        Object.defineProperty(navigator,'standalone',{configurable:true,value:true});
+        render();
+    }""")
+    assert page.locator('[data-action=print-browser]').count()==0
+    page.evaluate('() => window.LineGuidePdf.browserPrint()')
+    assert page.evaluate('window.__printCalls') == 0
+    assert any('Home Screen' in x for x in dialogs)
+    assert not errors
+
+@pytest.mark.group3
+def test_browser_print_in_regular_browser_uses_print(app):
+    page, _, errors, _=app
+    prepare_one(page,'Browser print check')
+    page.evaluate('() => {window.__printCalls=0;window.__printStacks=[];window.print=()=>{window.__printCalls++;window.__printStacks.push(new Error().stack)};}')
+    page.locator('[data-action=print-browser]').click()
+    assert page.evaluate('window.__printCalls') == 1, page.evaluate('window.__printStacks')
+    assert not errors
+
+@pytest.mark.group4
+def test_pdf_export_includes_previous_revision_warning(app):
+    page, _, errors, _=app
+    prepare_one(page,'Historical revision PDF')
+    page.locator('[data-action=open]').click()
+    page.locator('[data-action=edit]').click()
+    # Let the existing tested revision workflow create a new revision.
+    page.locator('[name=title]').fill('Historical revision PDF — updated')
+    for i in range(3):
+        page.locator('#nextBtn').click()
+    page.locator('[name=changeNote]').fill('Quality assurance revised this procedure')
+    page.locator('#nextBtn').click()
+    assert page.locator('[data-action=save-pdf]').count()==1
+    with page.expect_download() as info:page.locator('[data-action=save-pdf]').click()
+    current=fitz.open(info.value.path())
+    assert 'Historical revision PDF - updated' in '\n'.join(p.get_text() for p in current) or 'Historical revision PDF' in '\n'.join(p.get_text() for p in current)
+    page.locator('[data-action=open]').click()
+    page.locator('[data-action=view-revision]').first.click()
+    with page.expect_download() as info:page.locator('[data-action=save-pdf]').click()
+    archived=fitz.open(info.value.path())
+    text='\n'.join(p.get_text() for p in archived)
+    assert 'ARCHIVED REVISION' in text
+    assert 'Historical revision PDF' in text
+    assert not errors
+
+@pytest.mark.group1
+def test_pdf_embeds_actual_photo(app):
+    page,_,errors,_=app
+    prepare_one(page,'PDF with embedded photo')
+    # A real image was attached during authoring in the other regression suite;
+    # inject equivalent locally stored camera data for the PDF unit path.
+    page.evaluate("""() => {
+      const canvas=document.createElement('canvas');canvas.width=320;canvas.height=220;
+      const c=canvas.getContext('2d');c.fillStyle='#aaccdd';c.fillRect(0,0,320,220);
+      c.fillStyle='#182f40';c.fillRect(40,30,180,90);
+      data.find(p=>p.title==='PDF with embedded photo').steps[0].photo=canvas.toDataURL('image/jpeg',.8);
+      render();
+    }""")
+    with page.expect_download() as info:page.locator('[data-action=save-pdf]').click()
+    d=fitz.open(info.value.path());imgs=sum(len(x.get_images()) for x in d)
+    assert imgs==1
+    assert 'PDF with embedded photo' in '\n'.join(p.get_text() for p in d)
+    assert not errors
+
+@pytest.mark.group2
+def test_long_pdf_multipage_layout_has_page_numbers(app):
+    page,_,errors,_=app
+    prepare_one(page,'Long PDF and page numbers')
+    page.evaluate("""() => {
+      const p=data.find(v=>v.title==='Long PDF and page numbers');
+      p.steps=Array.from({length:20},(_,i)=>({
+        action:'Test instruction '+i+'. Observe machine indication and compare with the approved limit. '.repeat(5),
+        expected:'Correct condition established using approved criteria.',
+        warning:i%3===0?'Test caution: this is example content only.':'',
+        photo:''
+      }));render();
+    }""")
+    with page.expect_download() as info:page.locator('[data-action=save-pdf]').click()
+    d=fitz.open(info.value.path());assert len(d)>=3
+    alltext='\n'.join(p.get_text() for p in d)
+    assert 'Test instruction 0.' in alltext and 'Test instruction 19.' in alltext
+    for i,p in enumerate(d):
+        assert f'Page {i+1} of {len(d)}' in p.get_text()
+        for x0,y0,x1,y1,*_ in p.get_text('blocks'):
+            assert x0 >= -1 and y0 >= -1 and x1 < p.rect.width + 1 and y1 < p.rect.height+1
+    assert not errors
+
+@pytest.mark.group3
+def test_pdf_file_share_path_and_cancellation(app):
+    page,_,errors,_=app
+    prepare_one(page,'Native share PDF')
+    page.evaluate("""() => {
+        window.__shared=false;
+        Object.defineProperty(navigator,'canShare',{configurable:true,value:({files})=>files?.length===1});
+        Object.defineProperty(navigator,'share',{configurable:true,value:({files})=>{
+          window.__shared=files[0].name.endsWith('.pdf')&&files[0].type==='application/pdf';
+          return Promise.reject({name:'AbortError'});
+        }});
+    }""")
+    page.locator('[data-action=save-pdf]').click()
+    assert page.evaluate('window.__shared')
+    assert not errors
+
+@pytest.mark.group4
+def test_pdf_legacy_png_photo_is_preserved(app):
+    pg,_,errors,_=app
+    prepare_one(pg,'Legacy PNG photo export')
+    pg.evaluate("""() => {
+      const canvas=document.createElement('canvas');canvas.width=180;canvas.height=110;
+      const c=canvas.getContext('2d');c.fillStyle='orange';c.fillRect(0,0,180,110);
+      data.find(p=>p.title==='Legacy PNG photo export').steps[0].photo=canvas.toDataURL('image/png');
+      render();
+    }""")
+    pg.locator('.docpreview img.docphoto').wait_for()
+    pg.wait_for_function("() => document.querySelector('.docpreview img.docphoto')?.complete === true")
+    with pg.expect_download() as download: pg.locator('[data-action=save-pdf]').click()
+    pdf=fitz.open(download.value.path())
+    assert sum(len(p.get_images()) for p in pdf)==1
+    assert 'Photo could not be embedded' not in '\n'.join(p.get_text() for p in pdf)
+    assert not errors
+
+@pytest.mark.group1
+def test_pdf_technical_symbols_have_unambiguous_output(app):
+    pg,_,errors,_=app
+    prepare_one(pg,'Technical symbols PDF')
+    pg.evaluate("""() => {data.find(p=>p.title==='Technical symbols PDF').steps[0].action='Measure R ≥ 1 MΩ ± 5% at 20°C; confirm Δ reading ≤ 2µA.';render();}""")
+    with pg.expect_download() as download:pg.locator('[data-action=save-pdf]').click()
+    text='\n'.join(page.get_text() for page in fitz.open(download.value.path()))
+    for term in ['Measure R >= 1 MOhm', 'Delta reading <= 2µA']:
+        assert term in text,term
+    assert not errors
+
+@pytest.mark.group2
+def test_pdf_unknown_symbol_stops_export_without_silent_change(app):
+    pg,_,errors,dialogs=app
+    prepare_one(pg,'Reject ambiguous symbol')
+    pg.evaluate("""() => {data.find(p=>p.title==='Reject ambiguous symbol').steps[0].action='Check the 🧲 status';render();}""")
+    pg.locator('[data-action=save-pdf]').click()
+    pg.wait_for_timeout(100)
+    assert any('not supported in PDF export' in m for m in dialogs)
+    assert not errors

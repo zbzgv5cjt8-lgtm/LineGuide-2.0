@@ -1,6 +1,6 @@
 /* Offline shell only; procedure data is stored separately in the browser. */
-const CACHE='lineguide-shell-v2-6-quality';
-const CORE=['./','./index.html','./app.js','./manifest.json'];
+const CACHE='lineguide-shell-v2-7-pdf';
+const CORE=['./','./index.html','./app.js','./pdf-export.js','./manifest.json'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });
