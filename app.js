@@ -4,21 +4,40 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const OWN=['title','site','line','asset','taskType','audience','purpose','prerequisites','tools','ppe','isolation','guards','finalChecks','notes','owner','reviewer','approver','status','changeNote','created','updated','submittedAt','approvedAt','approvedBy','archiveState','templateType','documentNumber'];
 const statuses=['Draft','In review','Approved'];
 const TEMPLATES=['Standard operating procedure (SOP)','Work instruction','Inspection procedure'];
-const TASK_TYPES=['Operation / changeover','Inspection','Cleaning','Adjustment','Repair / replacement','Testing / verification','Maintenance','Troubleshooting','Commissioning','Other'];
-const AUDIENCES=['Maintenance engineers','Operators','Engineering supervisors','Competent contractors','Quality / inspection team','Production team'];
-const PPE_CHOICES=['Safety footwear','Safety glasses / goggles','Hearing protection','Task-specific gloves','Protective clothing','Hard hat','Face shield','Respiratory protection','Other — specify below'];
-const PREREQ_CHOICES=['Competence / task training','Authorisation to work','Relevant risk assessment','OEM documentation reviewed','Permit to work (where required)','Approved isolation procedure (where required)','Other — specify below'];
-const STEP_TYPES=['Instruction','Inspection / check','Adjustment','Measurement / test','Record / handover'];
-const VERIFY_METHODS=['Specify in instructions','Visual inspection','Measurement against approved limits','Functional test to approved method','Document / record check','Other — specify below'];
+// Curated, short option lists. Machine-specific details must come from approved instructions.
+const TASK_TYPES=['Operation / changeover','Inspection','Cleaning','Adjustment','Repair / replacement','Testing / verification'];
+const AUDIENCES=['Maintenance engineers','Operators','Supervisors','Contractors'];
+const PPE_CHOICES=['Safety footwear','Eye protection','Hearing protection','Gloves','Protective clothing','Respiratory protection'];
+const PREREQ_CHOICES=['Competence / training','Authorisation / permit','Risk assessment','OEM / approved procedure','Isolation / safe state'];
+const HAZARD_CHOICES=['Electrical','Moving parts / entrapment','Pneumatic / hydraulic','Stored energy / suspended loads','Hot / sharp surfaces','Chemicals / dust','Slips / trips / falls','Noise'];
+const STEP_TYPES=['Action / instruction','Inspection / check','Adjustment / test','Record / handover'];
+const VERIFY_METHODS=['Visual check','Measurement to approved limits','Functional test','Record / sign-off'];
+const LEGACY_OTHER=['Other / site-specific','Other — specify below','Other'];
+const MULTI_FIELDS=['hazards','ppeItems','prerequisiteTypes'];
 function existingValues(field){return [...new Set(data.map(p=>p[field]).filter(x=>typeof x==='string'&&x.trim()))].sort((a,b)=>a.localeCompare(b))}
+function curatedValues(field, defaults, current){
+ // Keep the menu tidy: common choices plus at most three previously entered extras.
+ const extras=existingValues(field).filter(x=>!defaults.includes(x)&&x!==current).slice(0,3);
+ return [...defaults,...extras,...(current&&!defaults.includes(current)?[current]:[])];
+}
 function choiceMarkup(name, value, values, label, required=false){
  const options=[...new Set(values.filter(x=>typeof x==='string'&&x.trim()))];
  const hasMatch=options.includes(value), isCustom=!!value&&!hasMatch, selection=hasMatch?value:isCustom?'__custom__':'';
  const selectOptions=options.map(x=>`<option value="${esc(x)}" ${selection===x?'selected':''}>${esc(x)}</option>`).join('');
- return `<div class="field choice-field" data-choice-wrap="${esc(name)}"><label>${esc(label)}${required?' *':''}</label><select name="${esc(name)}Choice" data-choice="${esc(name)}" ${required?'required':''}><option value="" ${!selection?'selected':''}>Choose ${esc(label.toLowerCase())}…</option>${selectOptions}<option value="__custom__" ${selection==='__custom__'?'selected':''}>＋ Add new / other…</option></select><input type="text" name="${esc(name)}" class="custom-choice ${selection==='__custom__'?'':'hidden'}" value="${esc(value||'')}" placeholder="Enter ${esc(label.toLowerCase())}" ${selection==='__custom__'&&required?'required':''}><div class="small">Choose an existing value, or add your own.</div></div>`;
+ return `<div class="field choice-field" data-choice-wrap="${esc(name)}"><label>${esc(label)}${required?' *':''}</label><select name="${esc(name)}Choice" data-choice="${esc(name)}" ${required?'required':''}><option value="" ${!selection?'selected':''}>Choose ${esc(label.toLowerCase())}…</option>${selectOptions}<option value="__custom__" ${selection==='__custom__'?'selected':''}>Other — enter your own…</option></select><input type="text" name="${esc(name)}" class="custom-choice ${selection==='__custom__'?'':'hidden'}" value="${esc(value||'')}" placeholder="Enter your own ${esc(label.toLowerCase())}" ${selection==='__custom__'?'required':''}><div class="small">Only relevant options are shown. Choose Other to enter your own.</div></div>`;
 }
 function basicSelect(name,value,values,label,required=false){return `<div class="field"><label>${esc(label)}${required?' *':''}</label><select name="${esc(name)}" ${required?'required':''}>${required?'<option value="">Select an option…</option>':''}${values.map(x=>`<option value="${esc(x)}" ${value===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`}
-function multiChoice(name,values,chosen,label){return `<div class="field"><label>${esc(label)}</label><details class="multiselect"><summary>Choose all that apply (${(chosen||[]).length} selected)</summary><div class="choice-grid">${values.map(v=>`<label class="checkline"><input type="checkbox" name="${esc(name)}" value="${esc(v)}" ${(chosen||[]).includes(v)?'checked':''}>${esc(v)}</label>`).join('')}</div></details></div>`}
+function multiChoice(name,values,chosen,label){
+ const selected=Array.isArray(chosen)?chosen:[];
+ const custom=selected.filter(x=>!values.includes(x)&&!LEGACY_OTHER.includes(x));
+ const hasOther=custom.length>0||selected.some(x=>LEGACY_OTHER.includes(x));
+ const count=selected.filter(x=>!LEGACY_OTHER.includes(x)).length;
+ return `<div class="field" data-multi-wrap="${esc(name)}"><label>${esc(label)}</label><details class="multiselect"><summary>Choose relevant options (${count} selected)</summary><div class="choice-grid">${values.map(v=>`<label class="checkline"><input type="checkbox" name="${esc(name)}" value="${esc(v)}" ${selected.includes(v)?'checked':''}>${esc(v)}</label>`).join('')}<label class="checkline"><input type="checkbox" data-multi-other="${esc(name)}" ${hasOther?'checked':''}>Other — enter your own</label></div><div class="multi-other ${hasOther?'':'hidden'}"><label for="custom-${esc(name)}">Your own answers (one per line)</label><textarea id="custom-${esc(name)}" data-multi-custom="${esc(name)}" placeholder="Enter a relevant item on each line…">${esc(custom.join('\n'))}</textarea><div class="small">These entries are included in the saved document, not added to everyone’s default choices.</div></div></details></div>`;
+}
+function stepChoice(name,value,values,label){
+ const known=values.includes(value), custom=!!value&&!known, selected=known?value:custom?'__custom__':'';
+ return `<div class="field"><label>${esc(label)}</label><select data-step-choice="${esc(name)}"><option value="" ${!selected?'selected':''}>Choose if relevant…</option>${values.map(x=>`<option value="${esc(x)}" ${selected===x?'selected':''}>${esc(x)}</option>`).join('')}<option value="__custom__" ${selected==='__custom__'?'selected':''}>Other — enter your own…</option></select><input type="text" data-step="${esc(name)}" class="custom-choice ${custom?'':'hidden'}" value="${esc(value||'')}" placeholder="Enter your own ${esc(label.toLowerCase())}" ${custom?'required':''}></div>`;
+}
 
 const photosafe=s=>typeof s==='string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s);
 const jsoncopy=x=>JSON.parse(JSON.stringify(x));
@@ -73,26 +92,27 @@ document.querySelector('.nav').addEventListener('click',e=>{
 function leaveBuilder(){if(page!=='builder'||!builderDirty)return true;return confirm('Discard unsaved changes to this procedure? Your existing saved documents will not be changed.')}
 function empty(t){return `<div class="empty">${esc(t)}</div>`}
 function itemCard(p){return `<div class="item"><div class="itemtop"><div><div class="itemtitle">${esc(p.title)}</div><div class="crumb">${crumb(p)}</div></div>${badge(p.status)}</div><div class="actions"><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open</button><button class="btn ghost" data-action="edit" data-id="${esc(p.id)}">Edit</button></div></div>`}
-function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">YOUR ENGINEERING REFERENCE</div><h1>Good procedures.<br>Easy to find.</h1><p class="muted">Create thorough, consistent instructions once, then find them by site, line, asset or task.</p><div class="actions"><button class="btn green" data-action="new">＋ Create procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. Create your first one.')}</section><section class="panel"><h3>Built for practical engineering</h3><div class="pillrow"><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">Safety prompts</span><span class="pill">PDF / print</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">Quick-select build v2.2 · Prototype data is stored on this device only. It does not sync with other engineers.</p></section>`}
+function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">YOUR ENGINEERING REFERENCE</div><h1>Good procedures.<br>Easy to find.</h1><p class="muted">Create thorough, consistent instructions once, then find them by site, line, asset or task.</p><div class="actions"><button class="btn green" data-action="new">＋ Create procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. Create your first one.')}</section><section class="panel"><h3>Built for practical engineering</h3><div class="pillrow"><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">Safety prompts</span><span class="pill">PDF / print</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">Relevant-choice build v2.3 · Prototype data is stored on this device only. It does not sync with other engineers.</p></section>`}
 function library(){let arr=data.filter(p=>[p.title,p.site,p.line,p.asset,p.taskType,p.purpose,p.notes].join(' ').toLowerCase().includes(searchTerm.toLowerCase()));if(filterStatus!=='all')arr=arr.filter(p=>p.status===filterStatus);return `<section class="welcome"><div class="eyebrow">PROCEDURE LIBRARY</div><h1>Find a procedure</h1><p class="muted">Search by task, asset, line, site or keyword.</p></section><input class="search" id="searchInput" placeholder="⌕  e.g. belt, Packing Line 04, sensor" value="${esc(searchTerm)}"><div class="toolbar"><select id="statusFilter" class="search"><option value="all">All document states</option><option>Draft</option><option>In review</option><option>Approved</option></select><button class="btn green" data-action="new">＋ Create</button><button class="btn secondary" data-action="export">Export backup</button><button class="btn secondary" data-action="import">Import backup</button></div><div id="libraryResults">${arr.map(itemCard).join('')||empty('No matching procedures. Try another search or create a procedure.')}</div>`}
 function browse(){let sites=[...new Set(data.map(p=>p.site).filter(Boolean))];return `<section class="welcome"><div class="eyebrow">ASSET HIERARCHY</div><h1>Browse by equipment</h1><p class="muted">Follow your site structure: site → line → asset → task.</p></section>${sites.map(site=>{let lines=[...new Set(data.filter(p=>p.site===site).map(p=>p.line))];return `<section class="panel"><h2>🏭 ${esc(site)}</h2>${lines.map(line=>{let assets=[...new Set(data.filter(p=>p.site===site&&p.line===line).map(p=>p.asset))];return `<div class="item"><h3>↳ ${esc(line||'Unassigned line')}</h3>${assets.map(asset=>`<div style="padding:8px 0 8px 12px;border-left:2px solid #dce3e8;margin:8px 0"><strong>⚙ ${esc(asset||'Unassigned asset')}</strong>${data.filter(p=>p.site===site&&p.line===line&&p.asset===asset).map(p=>`<div class="item" style="margin:8px 0 0"><div class="itemtitle">↳ ${esc(p.taskType||p.title)}</div><div class="crumb">${esc(p.title)}</div><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open procedure</button></div>`).join('')}</div>`).join('')}</div>`}).join('')}</section>`}).join('')||empty('Create a procedure to start your asset library.')}`}
 function startBuilder(p=null){builderDirty=false;editingId=p?.id||null;stepDrafts=p?JSON.parse(JSON.stringify(p.steps||[])):[];draftFields=p?JSON.parse(JSON.stringify(p)): {title:'',site:'',line:'',asset:'',templateType:'Standard operating procedure (SOP)',taskType:'Operation / changeover',audience:'Maintenance engineers',purpose:'',prerequisites:'',tools:'',hazards:[],ppeItems:[],prerequisiteTypes:[],ppe:'',isolation:'',guards:'',finalChecks:'',notes:'',owner:'',reviewer:'',approver:'',status:'Draft',changeNote:'Initial issue'};if(p&&p.status!=='Draft')draftFields.status='Draft';wizardStep=1;page='builder';render()}
-function stepEditor(s={},i){return `<div class="stepbox" data-step-index="${i}"><div class="stephead"><div class="stepnum">${i+1}</div><strong>Instruction step ${i+1}</strong><button type="button" class="btn danger" style="margin-left:auto;padding:7px 10px;min-height:34px" data-action="remove-step" data-index="${i}">Remove</button></div><div class="field"><label>Step category</label><select data-step="type">${STEP_TYPES.map(x=>`<option ${s.type===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Action *</label><textarea data-step="action" required placeholder="Describe one clear action…">${esc(s.action||'')}</textarea></div><div class="field"><label>Expected result *</label><textarea data-step="expected" required placeholder="What should be true when this step is complete?">${esc(s.expected||'')}</textarea></div><div class="field"><label>Verification method</label><textarea data-step="verify" placeholder="How is the expected result checked?">${esc(s.verify||'')}</textarea></div><div class="field"><label>Verification approach</label><select data-step="verifyMethod">${VERIFY_METHODS.map(x=>`<option ${s.verifyMethod===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div><div class="field"><label>Warning / caution</label><textarea data-step="warning" placeholder="Task-specific warning from approved sources…">${esc(s.warning||'')}</textarea></div><div class="field"><label>Photo / visual reference</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" src="${photosafe(s.photo)?esc(s.photo):''}" alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="small">Use a real photo of the actual equipment and label components where needed.</div></div></div>`}
-function builder(){let p=editingId?data.find(x=>x.id===editingId):null,d=draftFields||{};return `<section class="welcome"><div class="eyebrow">${p?'EDIT PROCEDURE':'GUIDED AUTHORING'}</div><h1>${p?'Revise a procedure':'Create a procedure'}</h1><p class="muted">Answer the relevant questions once. LineGuide turns your answers into a consistent document.</p><div class="pillrow"><span class="pill">Step ${wizardStep} of 4</span><span class="pill">Changes are saved when you finish the wizard</span></div></section><div class="panel"><div class="grid" style="margin-bottom:15px">${['Identify','Requirements','Instructions','Review'].map((x,i)=>`<div class="stat" style="padding:8px;border-color:${wizardStep===i+1?'#216b55':'#dce3e8'};background:${wizardStep===i+1?'#e8f2ee':'#f8fafb'}"><strong style="font-size:14px">${x}</strong><span>Stage ${i+1}</span></div>`).join('')}</div><form id="builderForm">
+function stepEditor(s={},i){return `<div class="stepbox" data-step-index="${i}"><div class="stephead"><div class="stepnum">${i+1}</div><strong>Instruction step ${i+1}</strong><button type="button" class="btn danger" style="margin-left:auto;padding:7px 10px;min-height:34px" data-action="remove-step" data-index="${i}">Remove</button></div>${stepChoice('type',s.type||'',STEP_TYPES,'Step category')}<div class="field"><label>Action *</label><textarea data-step="action" required placeholder="Describe one clear action…">${esc(s.action||'')}</textarea></div><div class="field"><label>Expected result *</label><textarea data-step="expected" required placeholder="What should be true when this step is complete?">${esc(s.expected||'')}</textarea></div>${stepChoice('verifyMethod',s.verifyMethod||'',VERIFY_METHODS,'Verification approach')}<div class="field"><label>Verification details</label><textarea data-step="verify" placeholder="How is the expected result checked? Use approved criteria.">${esc(s.verify||'')}</textarea></div><div class="field"><label>Warning / caution</label><textarea data-step="warning" placeholder="Task-specific warning from approved sources…">${esc(s.warning||'')}</textarea></div><div class="field"><label>Photo / visual reference</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" src="${photosafe(s.photo)?esc(s.photo):''}" alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="small">Use a real photo of the actual equipment and label components where needed.</div></div></div>`}
+
+function builder(){let p=editingId?data.find(x=>x.id===editingId):null,d=draftFields||{};return `<section class="welcome"><div class="eyebrow">${p?'EDIT PROCEDURE':'GUIDED AUTHORING'}</div><h1>${p?'Revise a procedure':'Create a procedure'}</h1><p class="muted">Choose from short, relevant lists. Use Other when the correct answer is not listed.</p><div class="pillrow"><span class="pill">Step ${wizardStep} of 4</span><span class="pill">Changes are saved when you finish the wizard</span></div></section><div class="panel"><div class="grid" style="margin-bottom:15px">${['Identify','Requirements','Instructions','Review'].map((x,i)=>`<div class="stat" style="padding:8px;border-color:${wizardStep===i+1?'#216b55':'#dce3e8'};background:${wizardStep===i+1?'#e8f2ee':'#f8fafb'}"><strong style="font-size:14px">${x}</strong><span>Stage ${i+1}</span></div>`).join('')}</div><form id="builderForm">
 <div class="${wizardStep===1?'':'hidden'}" data-stage="1"><h2>1. Identify the procedure</h2>
 ${basicSelect('templateType',d.templateType||TEMPLATES[0],TEMPLATES,'Document template',true)}
 <div class="field"><label>Procedure title *</label><input name="title" required value="${esc(d.title||'')}" placeholder="e.g. Replace conveyor belt"></div>
 ${choiceMarkup('site',d.site||'',existingValues('site'),'Site',true)}
 ${choiceMarkup('line',d.line||'',[...new Set(data.filter(p=>!d.site||p.site===d.site).map(p=>p.line).filter(Boolean))].sort(),'Production line',true)}
 ${choiceMarkup('asset',d.asset||'',[...new Set(data.filter(p=>(!d.site||p.site===d.site)&&(!d.line||p.line===d.line)).map(p=>p.asset).filter(Boolean))].sort(),'Asset / machine',true)}
-${choiceMarkup('taskType',d.taskType||'',[...TASK_TYPES,...existingValues('taskType')],'Task type')}
-${choiceMarkup('audience',d.audience||'',[...AUDIENCES,...existingValues('audience')],'Intended audience')}
+${choiceMarkup('taskType',d.taskType||'',curatedValues('taskType',TASK_TYPES,d.taskType),'Task type')}
+${choiceMarkup('audience',d.audience||'',curatedValues('audience',AUDIENCES,d.audience),'Intended audience')}
 <div class="field"><label>Purpose / scope *</label><textarea name="purpose" required placeholder="Describe the scope and exclusions specific to this task.">${esc(d.purpose||'')}</textarea></div></div>
 <div class="${wizardStep===2?'':'hidden'}" data-stage="2"><h2>2. Requirements and safety</h2>
 ${multiChoice('prerequisiteTypes',PREREQ_CHOICES,d.prerequisiteTypes||[],'Prerequisite categories — select relevant items')}
 <div class="field"><label>Prerequisites and competence *</label><textarea name="prerequisites" required placeholder="State the actual training, authorisations, permit numbers and other requirements from approved sources.">${esc(d.prerequisites||'')}</textarea></div>
 <div class="field"><label>Tools, materials and parts</label><textarea name="tools" placeholder="Required tools, consumables, parts and specifications.">${esc(d.tools||'')}</textarea></div>
-${multiChoice('hazards',['Electrical','Pneumatic / hydraulic','Moving machinery','Gravity / suspended loads','Hot surfaces','Chemicals / product','Working at height','Noise','Sharp edges','Pinch / crush points','Slips / trips','Manual handling','Dust / airborne contaminants','Other / site-specific'],d.hazards||[],'Relevant hazards — select all that apply')}
+${multiChoice('hazards',HAZARD_CHOICES,d.hazards||[],'Relevant hazards — select all that apply')}
 ${multiChoice('ppeItems',PPE_CHOICES,d.ppeItems||[],'PPE — select only what approved guidance requires')}
 <div class="field"><label>Additional PPE and work-area requirements</label><textarea name="ppe" placeholder="List equipment-specific PPE, permit conditions and other requirements from the approved assessment.">${esc(d.ppe||'')}</textarea></div>
 <div class="field"><label>Isolation / safe-state reference *</label><textarea name="isolation" required placeholder="Reference the approved machine-specific isolation and stored-energy control procedure. Do not guess isolation points.">${esc(d.isolation||'')}</textarea></div>
@@ -114,17 +134,46 @@ function captureSteps(){
 }
 function captureForm(){
  const f=$('#builderForm');if(!f)return;
- const o={...draftFields},multi={hazards:[],ppeItems:[],prerequisiteTypes:[]};
- for(let el of f.elements){if(!el.name)continue;
-   if(Object.prototype.hasOwnProperty.call(multi,el.name)){if(el.checked)multi[el.name].push(el.value)}
-   else if(el.dataset.choice)continue;
-   else if(el.type!=='button'&&el.type!=='submit')o[el.name]=el.value;
+ const o={...draftFields};
+ for(let el of f.elements){if(!el.name||MULTI_FIELDS.includes(el.name))continue;
+   if(el.dataset.choice)continue;
+   if(el.type!=='button'&&el.type!=='submit')o[el.name]=el.value;
  }
- Object.assign(o,multi);o.steps=jsoncopy(stepDrafts);draftFields=o;
+ for(const name of MULTI_FIELDS){
+   const wrap=f.querySelector(`[data-multi-wrap="${name}"]`);
+   if(!wrap)continue;
+   const chosen=[...wrap.querySelectorAll(`input[name="${name}"]:checked`)].map(el=>el.value);
+   const other=wrap.querySelector(`[data-multi-other="${name}"]`);
+   if(other?.checked){
+     const custom=wrap.querySelector(`[data-multi-custom="${name}"]`).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+     for(const text of custom)if(!chosen.includes(text))chosen.push(text);
+   }
+   o[name]=chosen;
+ }
+ o.steps=jsoncopy(stepDrafts);draftFields=o;
 }
+
 function collectForm(){captureSteps();captureForm();return {...draftFields,steps:jsoncopy(stepDrafts)}}
 function validateStage(n){
  const stage=$(`#builderForm [data-stage="${n}"]`);
+ for(const select of stage.querySelectorAll('[data-choice]')){
+   if(select.value==='__custom__'){
+     const input=select.closest('[data-choice-wrap]').querySelector(`input[name="${select.dataset.choice}"]`);
+     if(!input.value.trim()){alert('Enter your own answer for '+select.closest('.field').querySelector('label').textContent);input.focus();return false}
+   }
+ }
+ for(const other of stage.querySelectorAll('[data-multi-other]')){
+   if(other.checked){const custom=other.closest('[data-multi-wrap]').querySelector('[data-multi-custom]');
+     if(!custom.value.trim()){alert('Enter your own answer, or untick Other.');custom.focus();return false}
+   }
+ }
+ for(const select of stage.querySelectorAll('[data-step-choice]')){
+   if(select.value==='__custom__'){
+     const input=select.closest('.field').querySelector('[data-step]');
+     if(!input.value.trim()){alert('Enter your own '+select.closest('.field').querySelector('label').textContent);input.focus();return false}
+   }
+ }
+
  for(let el of stage.querySelectorAll('[required]')){
    if(!String(el.value||'').trim()){
      alert('Please complete: '+(el.closest('.field')?.querySelector('label')?.textContent||'required field'));
@@ -143,9 +192,14 @@ function validateAllFields(fields){
  if(!Array.isArray(fields.steps)||!fields.steps.length||fields.steps.some(s=>!s.action?.trim()||!s.expected?.trim())){alert('At least one complete instruction step is required.');return false}
  return true;
 }
+function updateMultiCount(detail){
+ const selected=detail.querySelectorAll('input[name]:checked').length;
+ const custom=detail.querySelector('[data-multi-other]:checked') ? detail.querySelector('[data-multi-custom]').value.split(/\r?\n/).filter(x=>x.trim()).length:0;
+ detail.querySelector('summary').textContent=`Choose relevant options (${selected+custom} selected)`;
+}
 function wireBuilder(){
  const f=$('#builderForm');if(!f)return;
- f.addEventListener('input',()=>{builderDirty=true});
+ f.addEventListener('input',event=>{builderDirty=true;const detail=event.target.closest('details.multiselect');if(detail)updateMultiCount(detail)});
  f.addEventListener('change',event=>{
    builderDirty=true;
    const el=event.target;
@@ -153,7 +207,7 @@ function wireBuilder(){
      const field=el.dataset.choice,wrap=el.closest('[data-choice-wrap]'),custom=wrap.querySelector('input[name="'+field+'"]');
      const isCustom=el.value==='__custom__';
      custom.classList.toggle('hidden',!isCustom);
-     custom.required=isCustom&&['site','line','asset','owner'].includes(field);
+     custom.required=isCustom;
      custom.value=isCustom?'':el.value;
      if(isCustom)custom.focus();
      // Update child dropdowns while retaining edits in the rest of the form.
@@ -164,8 +218,19 @@ function wireBuilder(){
        render();window.scrollTo(0,position);
      }
    }
+   if(el.matches('[data-step-choice]')){
+     const input=el.closest('.field').querySelector(`[data-step="${el.dataset.stepChoice}"]`);
+     const isCustom=el.value==='__custom__';
+     input.classList.toggle('hidden',!isCustom);input.required=isCustom;input.value=isCustom?'':el.value;
+     if(isCustom)input.focus();
+   }
+   if(el.matches('[data-multi-other]')){
+     const wrap=el.closest('[data-multi-wrap]'),area=wrap.querySelector('[data-multi-custom]');
+     area.parentElement.classList.toggle('hidden',!el.checked);
+     if(el.checked)area.focus();
+   }
    const detail=el.closest('details.multiselect');
-   if(detail){const count=detail.querySelectorAll('input:checked').length;detail.querySelector('summary').textContent='Choose all that apply ('+count+' selected)'}
+   if(detail)updateMultiCount(detail);
  });
  $('#backBtn').onclick=()=>{if(wizardStep>1){captureSteps();captureForm();wizardStep--;render()}};
  $('#nextBtn').onclick=()=>{
