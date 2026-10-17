@@ -1,17 +1,20 @@
-# LineGuide changes
+# LineGuide changelog
 
-## v2.8 — Palletiser SOP reference pilot (17 October 2026)
+## v2.9 — Generic creator and ready-to-review documents
 
-- Single-document pilot based on the user's six-page palletiser operators' SOP; old generic first-run demo removed, existing user data preserved.
-- Added a prominent **Start palletiser SOP test** guided action and five source-derived activity groups.
-- Included optional source-page metadata and photo captions, plus shorter collapsible editor cards and an **Other** activity choice.
-- Added stage-4 activity coverage checks that do not prevent saving a work-in-progress Draft.
-- Grouped instructions in previews/PDFs; improved PDF section breaks and removed redundant visual-check labels.
-- Created a **private**, password-redacted local reference dataset containing 16 test steps and six photos, explicitly unapproved. Not published to this repository.
-- Added 4 regression tests (38 total) and a new automated test batch.
+- Removed all special palletiser authoring features, fixed five-activity list, dedicated Start Palletiser test button, source-only coverage gate, and document-specific software warnings.
+- Both SOP and SWP use the **same reusable four-stage builder**; any procedure may optionally group steps into activity/section headings.
+- Instruction cards collapse for readability, with a short per-document section dropdown plus **Other**, an optional source document page and photo captions.
+- Home offers **Import a prepared procedure**, which imports a generic LineGuide record and immediately opens a single prepared document for review. The user does not re-enter the procedure.
+- Legacy data containing pilot-only metadata is normalised as an ordinary procedure; headings and photographs survive.
+- Source-specific safety review notes belong to the private Draft's own content, never as special code branches in the app.
+- All equipment-specific content and original photos remain **private** and are excluded from the public repository.
+- Updated generic regression scenarios, including prepared import, PDF, revision and no hard-coded equipment questions.
 
-## Previous changes
+## v2.8 — Historical reference pilot
 
-v2.7: Reliable direct Save / Share PDF with Safari print fallback and photo support.
+Earlier internal testing explored a six-page source SOP with fixed pilot sections. Those experiment-specific controls have been removed. This does **not** remove or delete any procedures previously stored on an iPhone.
 
-v2.6: Core validation, SWP assessment routes, draft recovery, search, revision numbers and quality testing.
+## Earlier versions
+
+v2.7 introduced direct searchable PDF export; v2.6 added draft recovery, revision history and regression checks. The SOP/SWP standards and local-only limitations continue to apply.

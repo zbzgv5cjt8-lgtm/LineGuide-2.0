@@ -1,40 +1,39 @@
-# LineGuide v2.8 — Palletiser SOP Reference Pilot
+# LineGuide v2.9 — Engineering Procedure Generator
 
-LineGuide is currently being refined against a **single six-page palletiser operators' SOP**, using the information structure in the user's source document as a real-world test. The public code contains **no source photos, passwords or confidential company procedure wording**.
+LineGuide is a general-purpose, local-first SOP / SWP creator and document library. There are **no machine-specific authoring modes**, built-in palletiser forms, site-specific question lists or preloaded operational procedures.
 
-## Test the new app
+## Two ways to use LineGuide
 
-1. Open the hosted LineGuide app in iPhone Safari. Confirm the home screen says **Palletiser pilot v2.8**.
-2. Export a JSON backup of your existing records from the Library first.
-3. Tap **Start palletiser SOP test** for a new guided draft, or import the **private example JSON** supplied separately in the ChatGPT conversation to review a full demonstration with the original equipment photos.
-4. For manual entry, complete **Identify → Requirements → Instructions → Review**. At the Instructions stage, enter short actions and expected outcomes, assign each step to a source activity, attach a photo and optionally choose the original source page.
-5. Use **Next activity** to create the next activity group. The pilot covers:
-   - Recipe access and selection (source pages 1–2)
-   - Cell preparation and start-up (2–4)
-   - Normal operation and full pallet change (4–5)
-   - Part pallet / batch changeover (5)
-   - Production totals (5–6)
-6. In Review, check source coverage and save as **Draft**. Open the library and verify its site → line → asset hierarchy, searchable text and revision history.
-7. Open **Read full procedure → Save / Share PDF** and compare the generated A4 document with the source. Ensure the technical content and photos are accurate before any real use.
+**Review an already-created document (no authoring required):**
+1. Open LineGuide in Safari on your iPhone.
+2. On Home, tap **Import a prepared procedure**.
+3. Choose a privately provided LineGuide `.json` document from Files.
+4. Confirm the import; a one-document import opens immediately in the full-document preview. Review its steps, photos, section headings, document status and PDF export.
 
-For the mapping, design decisions and QA checklist, read [REFERENCE_SOP_PILOT.md](REFERENCE_SOP_PILOT.md).
+**Create a new document:**
+1. Home → **Create procedure**.
+2. Follow Identify → Requirements → Instructions → Review.
+3. Use short dropdowns with Other entries, conditional isolation and risk-assessment questions, and numbered steps.
+4. Optional **Activity / section** helps group any longer SOP/SWP, with re-usable choices from that document. Optional source-page and photo fields work with any source reference.
+5. Save and access through Home → Library or Browse (site → line → asset → task); export professional PDF, retain revisions and take JSON backups.
 
-## Data and privacy
+The Library also offers **Import procedures** for merging multiple backed-up records. Import and export act on device-local data; the repository does not contain procedures.
 
-- The original uploaded company PDF and the private reference import are **not published to GitHub**. Only the app structure and generic activity headings are in this public repository.
-- The local reference import includes source-derived test material and photos, with access credentials removed. Keep it private and do not import it on a shared/public device.
-- The new build does not erase old documents, and new installations no longer prepopulate unrelated demo records. Existing locally stored records are preserved unless explicitly deleted.
-- All records are stored in the current browser/device. Export backups regularly. The app is not yet a controlled shared repository.
+## Private source-document recreation
 
-## Safety
+A privately supplied reference document can be re-created as an ordinary LineGuide procedure **outside** the GitHub repository, using the identical record format as any user-created SOP/SWP. Its JSON can be imported in a single step. The app itself must not require an author to re-enter that document, or include hard-coded document-specific controls.
 
-- The reference SOP contains safety-system, machine-cell access and restart descriptions that must be checked by a competent person against current OEM/site procedures. The test import and generated PDFs are **not approved operating instructions**.
-- “Complete” in the app means inputs were supplied, **not** that a procedure is legally compliant, technically safe or approved.
-- The production SOP must not include secrets such as access passwords.
+Never publish equipment images, company instructions, access credentials or other sensitive operational materials in this public repo. Prepared private test data and source PDFs are **not** checked into GitHub.
 
-## Tests and installation
+## Safety / compliance
 
-The repository contains **38 Chromium browser tests**, including four reference-pilot scenarios. GitHub Actions runs five test batches on every push and pull request.
+The procedure generator does not automatically certify technical suitability. Any reconstructed document is a **Draft / Unapproved — Not for operational use** until competent site review. Machine-specific guarding, robot-cell access, isolation, permits and safe-state methods require the actual OEM and site-approved assessments. Do not insert access passwords in procedure records.
+
+Approval fields in this prototype are named records, **not authenticated signatures**. Procedural data lives only in the browser, so back up regularly. Do not use this prototype as the sole authoritative storage for workplace procedures.
+
+## Run/test
+
+Static files to host at GitHub Pages root: `index.html`, `app.js`, `pdf-export.js`, `sw.js`, `manifest.json`. Nothing needs a backend for personal prototype testing.
 
 ```sh
 python -m pip install -r requirements-test.txt
@@ -48,4 +47,4 @@ python -m pytest -q -m group4 tests/test_lineguide_e2e.py
 python -m pytest -q -m group5 tests/test_lineguide_e2e.py
 ```
 
-To self-host, publish `index.html`, `app.js`, `pdf-export.js`, `sw.js`, `manifest.json` at a GitHub Pages root. You can add the site to your iPhone Home Screen from Safari's Share menu. Procedure records stay in that browser's storage. Direct PDF export is supported; standard browser printing remains optional.
+GitHub Actions runs regression tests on every push or pull request. A separate **private** integration test can validate source-document import and photos without committing private content.
