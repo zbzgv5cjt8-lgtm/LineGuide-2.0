@@ -74,7 +74,7 @@ def prepare_one(pg,title='Example — startup',swp=False,site='QA Site',line='Li
 @pytest.mark.group1
 def test_home_and_mobile_width(app):
  pg,_,errors,_=app
- assert pg.get_by_text('Good procedures.').count()
+ assert pg.get_by_text('One reference SOP.').count()
  assert pg.evaluate('document.documentElement.scrollWidth<=window.innerWidth+1')
  assert pg.locator('[data-page]').count()==4
  assert not errors
@@ -204,7 +204,7 @@ def test_delete_cancel_then_confirm(app):
  p=prepare_one(pg,'Delete test')
  pg.locator('[data-page=library]').click()
  pg.locator('#searchInput').fill('Delete test')
- assert len(getdata(pg))>=2
+ assert len(getdata(pg))>=1
  pg.locator('[data-action=delete]').click()
  assert all(x['title']!='Delete test' for x in getdata(pg))
  assert any('Permanently delete' in msg for msg in dialogs)
@@ -234,7 +234,7 @@ def test_export_and_backups(app):
  pg.locator('[data-page=library]').click()
  with pg.expect_download() as download: pg.locator('[data-action=export]').click()
  backup=json.loads(download.value.path().read_text())
- assert backup['app']=='LineGuide' and len(backup['procedures'])==2
+ assert backup['app']=='LineGuide' and len(backup['procedures'])==1
  assert not errors
 
 @pytest.mark.group2
@@ -664,3 +664,106 @@ def test_pdf_unknown_symbol_stops_export_without_silent_change(app):
     pg.wait_for_timeout(100)
     assert any('not supported in PDF export' in m for m in dialogs)
     assert not errors
+
+# Uploaded palletiser SOP pilot: synthetic, non-operational fixtures only.
+PILOT_SECTIONS = [
+ 'Recipe access and selection',
+ 'Cell preparation and start-up',
+ 'Normal operation and full pallet change',
+ 'Part pallet / batch changeover',
+ 'Production totals',
+]
+
+@pytest.mark.group5
+def test_pilot_home_starts_from_original_sop_structure(app):
+ pg,_,errors,_=app
+ assert getdata(pg)==[]  # fresh installs do not contain unrelated demo procedures
+ pg.locator('[data-action=pilot-new]').click()
+ assert pg.locator('[name=templateType]').input_value()==SOP
+ assert pg.locator('[name=title]').input_value().startswith('Palletiser Operators SOP')
+ assert pg.locator('[name=purpose]').input_value().startswith('Test the guided procedure')
+ assert pg.locator('[name=templateType]').input_value()==SOP
+ assert not errors
+
+@pytest.mark.group5
+def test_pilot_section_navigation_and_review_gate(app):
+ pg,_,errors,_=app
+ pg.locator('[data-action=pilot-new]').click()
+ for name,v in [('site','QA Site'),('line','Line 01'),('asset','Test palletiser')]:
+  pg.locator('[data-choice='+name+']').select_option('__custom__')
+  pg.locator('input[name='+name+']').fill(v)
+ pg.locator('#nextBtn').click()
+ pg.locator('[data-isolation-mode]').select_option('not-required')
+ pg.locator('#nextBtn').click()
+ pg.locator('[data-action=add-step]').click()
+ pg.locator('[data-step=action]').first.fill('Identify the fictional test recipe')
+ pg.locator('[data-step=expected]').first.fill('The fictional recipe identity is confirmed')
+ assert pg.locator('[data-step=section]').first.input_value()==PILOT_SECTIONS[0]
+ pg.locator('[data-action=next-activity]').click()
+ assert pg.locator('[data-step=section]').last.input_value()==PILOT_SECTIONS[1]
+ pg.locator('[data-step=action]').last.fill('Check a fictional cell status')
+ pg.locator('[data-step=expected]').last.fill('Expected fictional state recorded')
+ assert pg.locator('details[data-step-index]').count()==2
+ assert pg.locator('details[data-step-index][open]').count()==1
+ pg.locator('[name=finalChecks]').fill('Check the fictional acceptance criteria')
+ pg.locator('#nextBtn').click()
+ assert '2 of 5' in pg.locator('.pilot-check').inner_text()
+ pg.locator('[data-choice=owner]').select_option('__custom__');pg.locator('input[name=owner]').fill('QA operator')
+ pg.locator('#nextBtn').click()
+ p=getdata(pg)[0]
+ assert p['pilotSource']=='palletiser-sop-reference'
+ assert [s['section'] for s in p['steps']]==PILOT_SECTIONS[:2]
+ assert PILOT_SECTIONS[0] in pg.locator('.docpreview').inner_text()
+ assert 'DO NOT USE AS OPERATING INSTRUCTIONS' in pg.locator('.docpreview').inner_text()
+ assert not errors
+
+@pytest.mark.group5
+def test_pilot_custom_other_activity_saved(app):
+ pg,_,errors,_=app
+ pg.locator('[data-action=pilot-new]').click()
+ for name,v in [('site','QA Site'),('line','Line 01'),('asset','Test palletiser')]:
+  pg.locator('[data-choice='+name+']').select_option('__custom__');pg.locator('input[name='+name+']').fill(v)
+ pg.locator('#nextBtn').click();pg.locator('[data-isolation-mode]').select_option('not-required');pg.locator('#nextBtn').click()
+ pg.locator('[data-action=add-step]').click()
+ pg.locator('[data-step-choice=section]').select_option('__custom__')
+ pg.locator('[data-step=section]').fill('Fictional quality check')
+ pg.locator('[data-step=action]').fill('Record the fictional value')
+ pg.locator('[data-step=expected]').fill('Recorded fictional value is visible')
+ pg.locator('[name=finalChecks]').fill('Check approved rules')
+ pg.locator('#nextBtn').click()
+ pg.locator('[data-choice=owner]').select_option('__custom__');pg.locator('input[name=owner]').fill('QA operator')
+ pg.locator('#nextBtn').click()
+ assert getdata(pg)[0]['steps'][0]['section']=='Fictional quality check'
+ assert 'Fictional quality check' in pg.locator('.docpreview').inner_text()
+ assert not errors
+
+@pytest.mark.group5
+def test_imported_pilot_sections_survive_revision_and_pdf(app):
+ pg,_,errors,_=app
+ from datetime import datetime,timezone
+ now=datetime.now(timezone.utc).isoformat()
+ doc={'id':'pilot-synthetic-test','title':'Palletiser reference structure — synthetic',
+  'site':'QA site','line':'QA line','asset':'QA palletiser',
+  'templateType':SOP,'pilotSource':'palletiser-sop-reference','taskType':'Operation / changeover',
+  'purpose':'Illustrate review structure only, not operating guidance','prerequisites':'Competent review',
+  'isolationMode':'not-required','isolationReason':'Synthetic case only',
+  'owner':'QA person','status':'Draft','revision':'1.0','created':now,'updated':now,
+  'finalChecks':'Confirm against approved fictional criteria','steps':[
+    {'section':title,'action':f'Check fictional stage {i+1}','expected':f'Fictional result {i+1}','sourcePage':str(i+1),'photoCaption':f'Test illustration {i+1}','photo':''}
+    for i,title in enumerate(PILOT_SECTIONS)]}
+ pg.evaluate('value=>{localStorage.setItem("lineguide-procedures-v1",JSON.stringify([value]));load();render()}',doc)
+ pg.locator('[data-page=library]').click();pg.locator('[data-action=open]').click()
+ assert '5 of 5' in pg.locator('.pilot-check').inner_text()
+ pg.locator('[data-action=preview]').click()
+ assert pg.locator('.docactivity').count()==5
+ import fitz
+ with pg.expect_download() as info:pg.locator('[data-action=save-pdf]').click()
+ pdf=fitz.open(info.value.path());text='\n'.join(page.get_text() for page in pdf)
+ for title in PILOT_SECTIONS:assert title in text
+ pg.locator('[data-action=open]').click();pg.locator('[data-action=edit]').click()
+ for _ in range(3):pg.locator('#nextBtn').click()
+ pg.locator('[name=changeNote]').fill('Check reference grouping and archive history')
+ pg.locator('#nextBtn').click()
+ version=getdata(pg)[0]
+ assert version['revision']=='1.1' and version['revisionHistory'][0]['steps'][4]['section']==PILOT_SECTIONS[4]
+ assert not errors

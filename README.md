@@ -1,45 +1,40 @@
-# LineGuide v2.7 — Procedure generator, storage and revision control
+# LineGuide v2.8 — Palletiser SOP Reference Pilot
 
-LineGuide is a **local-first, iPhone-friendly prototype** for creating and storing two types of engineering documents: Standard Operating Procedures (**SOP**) and Safe Working Procedures (**SWP**). It aims to be guided, minimal, clear and consistent.
+LineGuide is currently being refined against a **single six-page palletiser operators' SOP**, using the information structure in the user's source document as a real-world test. The public code contains **no source photos, passwords or confidential company procedure wording**.
 
-## Getting started
+## Test the new app
 
-1. Publish `index.html`, `app.js`, `pdf-export.js`, `sw.js`, and `manifest.json` at the **root** of a GitHub Pages repository (Settings → Pages → deploy from `main` → `/(root)`).
-2. Open the GitHub Pages address in Safari and use **Share → Add to Home Screen**.
-3. Start with fictional test procedures. Tap **Create**, choose an SOP or SWP, and work through four stages.
-4. On the Library screen, use **Export backup** to download a JSON copy. Keep backups somewhere safe and test importing one before relying on local records.
+1. Open the hosted LineGuide app in iPhone Safari. Confirm the home screen says **Palletiser pilot v2.8**.
+2. Export a JSON backup of your existing records from the Library first.
+3. Tap **Start palletiser SOP test** for a new guided draft, or import the **private example JSON** supplied separately in the ChatGPT conversation to review a full demonstration with the original equipment photos.
+4. For manual entry, complete **Identify → Requirements → Instructions → Review**. At the Instructions stage, enter short actions and expected outcomes, assign each step to a source activity, attach a photo and optionally choose the original source page.
+5. Use **Next activity** to create the next activity group. The pilot covers:
+   - Recipe access and selection (source pages 1–2)
+   - Cell preparation and start-up (2–4)
+   - Normal operation and full pallet change (4–5)
+   - Part pallet / batch changeover (5)
+   - Production totals (5–6)
+6. In Review, check source coverage and save as **Draft**. Open the library and verify its site → line → asset hierarchy, searchable text and revision history.
+7. Open **Read full procedure → Save / Share PDF** and compare the generated A4 document with the source. Ensure the technical content and photos are accurate before any real use.
 
-**Security:** GitHub Pages in a public repository publicly exposes the app's source code. Procedure records are stored in the **individual device's browser** and are not sent to GitHub. Do not use sensitive workplace data in this public-hosted prototype; local browser storage is not a secure, authenticated document management system.
+For the mapping, design decisions and QA checklist, read [REFERENCE_SOP_PILOT.md](REFERENCE_SOP_PILOT.md).
 
-## Procedure journey
+## Data and privacy
 
-1. **Identify:** SOP or SWP; site → production line → asset; title, task and purpose. Dropdown choices are short; **Other** accepts a custom answer.
-2. **Prepare:** prerequisites, selected hazards, PPE and applicable isolation/safe-state arrangements. An **SWP** must either reference an approved assessment and summarise its relevant controls, or record a guided task-specific assessment for competent review. SOPs can reference relevant assessments.
-3. **Instructions:** numbered actions, expected results, verification, warnings and optional automatically compressed photographs. Completion criteria are required.
-4. **Control:** author, reviewer, approver, document status and revision type. Save and preview the resulting document; use **Save / Share PDF** to create a genuine, searchable A4 PDF directly, with or without internet. On iPhone, choose **Save to Files** or **Print** from the share sheet. When using Safari in a browser tab, **Print in Safari** is also available.
+- The original uploaded company PDF and the private reference import are **not published to GitHub**. Only the app structure and generic activity headings are in this public repository.
+- The local reference import includes source-derived test material and photos, with access credentials removed. Keep it private and do not import it on a shared/public device.
+- The new build does not erase old documents, and new installations no longer prepopulate unrelated demo records. Existing locally stored records are preserved unless explicitly deleted.
+- All records are stored in the current browser/device. Export backups regularly. The app is not yet a controlled shared repository.
 
-The Library supports searching titles, sites, lines, assets, document references, hazards, and instruction text. Documents have stable references such as `LG-SOP-0001`, revisions `1.0`, `1.1`, `2.0`, and previous version snapshots. Deletion is available directly from the Library but is permanent and requires confirmation.
+## Safety
 
-## Draft and data behaviour
+- The reference SOP contains safety-system, machine-cell access and restart descriptions that must be checked by a competent person against current OEM/site procedures. The test import and generated PDFs are **not approved operating instructions**.
+- “Complete” in the app means inputs were supplied, **not** that a procedure is legally compliant, technically safe or approved.
+- The production SOP must not include secrets such as access passwords.
 
-- An unfinished wizard session is temporarily saved in browser storage and can be resumed from Home after an interruption. The definitive procedure record is only saved after completing the wizard.
-- Photos are resized/compressed to help avoid browser storage limits, but repeated photographs, long histories and exports can still exhaust limited local device storage.
-- JSON exports include revision snapshots and the document number counter. Previous v2.5-format backups are supported.
-- The service worker stores the app shell for offline use after the first online visit; offline behaviour is **not yet verified on a physical iPhone**. Do not assume you hold the latest approved workplace revision when offline.
+## Tests and installation
 
-## Safety and approval limitations
-
-- The app **does not determine technical safety**, generate approved isolation steps, or automatically select safe controls/PPE.
-- A template being complete does **not** certify that a procedure or risk assessment is suitable or compliant.
-- Approver names in this prototype are **not authenticated signatures**. A competent person must review procedures and risk assessments using site-approved controls before operational use.
-- This is not a shared, team-ready, controlled-document service: no user roles, server-side permissions, audit trail, immutable approval release or centrally backed-up database yet.
-- It is not appropriate to rely on this prototype as the sole approved safety system at work.
-
-## Automated quality tests
-
-The repository includes 34 Chromium browser tests and a GitHub Actions workflow that runs whenever the `main` branch is changed and on pull requests.
-
-Local run (Python + Playwright):
+The repository contains **38 Chromium browser tests**, including four reference-pilot scenarios. GitHub Actions runs five test batches on every push and pull request.
 
 ```sh
 python -m pip install -r requirements-test.txt
@@ -50,16 +45,7 @@ python -m pytest -q -m group1 tests/test_lineguide_e2e.py
 python -m pytest -q -m group2 tests/test_lineguide_e2e.py
 python -m pytest -q -m group3 tests/test_lineguide_e2e.py
 python -m pytest -q -m group4 tests/test_lineguide_e2e.py
+python -m pytest -q -m group5 tests/test_lineguide_e2e.py
 ```
 
-See `QA_REPORT.md` for the last local test results and the remaining test gaps. The checks run in isolated Chromium; they are **not** a substitute for iOS Safari testing, human review of actual documents, penetration testing or testing against live workplace procedures.
-
-## iPhone PDF export troubleshooting
-
-- LineGuide v2.7 no longer relies on `window.print()` for PDF generation. The preview has a **Save / Share PDF** button that creates a PDF entirely on-device; records and photos are not uploaded.
-- On iPhone, the native Share sheet normally appears. Choose **Save to Files** for an independent copy, or **Print** to select AirPrint. If sharing is unavailable, the app starts a regular PDF download instead; check Safari Downloads or Files.
-- **Print in Safari** is offered in ordinary browser tabs. It is deliberately omitted from a Home Screen web app, where recent iOS versions may silently ignore printing.
-- If the old button still appears, reload the app while online to install the latest offline cache. Do not delete Safari website data; that may delete your locally stored procedure library. Export a JSON backup first.
-- Important: real-device iPhone testing is still required. The automated tests exercise browser behaviour and generated PDF content but cannot directly validate Apple's native Share sheet.
-
-**Technical notation:** Common electrical and engineering symbols are preserved or rewritten unambiguously in the PDF (for example, Ω becomes “Ohm” and ≤ becomes “<=”). The export refuses unsupported characters rather than silently replacing them with potentially misleading symbols; edit the instruction and retry.
+To self-host, publish `index.html`, `app.js`, `pdf-export.js`, `sw.js`, `manifest.json` at a GitHub Pages root. You can add the site to your iPhone Home Screen from Safari's Share menu. Procedure records stay in that browser's storage. Direct PDF export is supported; standard browser printing remains optional.

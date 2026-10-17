@@ -102,6 +102,7 @@ function makePdf(p,archived=false){
  d.metaRow('Document reference',p.documentNumber||p.id,'Revision',String(p.revision||'1.0'));
  d.metaRow('Site',p.site||'Not specified','Line / asset',[p.line,p.asset].filter(Boolean).join(' / ')||'Not specified');
  d.note(archived?'ARCHIVED REVISION — REFERENCE ONLY. Not the current controlled document.':p.status==='Approved'?'APPROVED RECORD — check that this is the current applicable revision.':'DRAFT / UNAPPROVED — NOT FOR OPERATIONAL USE.',p.status==='Approved'&&!archived?'neutral':'warning');
+ if(p.pilotSource==='palletiser-sop-reference')d.note('PALLETISER REFERENCE TEST ONLY. Source access credentials intentionally omitted. Verify cell-entry, safety reset and guarding requirements using approved OEM and site documents before use.','warning');
  d.heading('1. Purpose and scope');d.text(p.purpose||'Purpose not recorded');d.gap(7);d.field('Intended audience',p.audience);
  d.heading('2. Preparation');
  const fields=[['Prerequisite categories',(p.prerequisiteTypes||[]).join(', ')],['Competence / prerequisites',p.prerequisites],['Tools / materials',p.tools],['PPE',(p.ppeItems||[]).join(', ')],['Other PPE / work-area controls',p.ppe],['Guards / protective devices',p.guards]];
@@ -118,14 +119,21 @@ function makePdf(p,archived=false){
  else if(p.isolationMode==='required')d.note('Isolation required. '+(p.isolation||'Approved reference not specified.'),'warning');
  else if(p.isolationMode==='other')d.note('Other approved safe-state arrangement. '+(p.isolation||'Reference not specified.'),'warning');
  else d.note('Isolation / safe-state classification not recorded. Confirm before use.','warning');
- d.heading('4. Working instructions');
+ d.ensure(160);d.heading('4. Working instructions');
  const steps=p.steps||[];if(!steps.length)d.note('No instruction steps recorded.','warning');
  for(const [i,s] of steps.entries()){
+  // Reserve space for the step title and the first image, where possible, to avoid orphan headings.
+  const image=s.photo?jpegInfo(s.photo):null;
+  const visualHeight=image?Math.min((W-12)/image.width,235/image.height,1)*image.height:0;
+  const newActivity=!!s.section&&(i===0||s.section!==steps[i-1].section);
+  d.ensure(Math.min(360,110+visualHeight+(newActivity?29:0)));
+  if(newActivity){d.gap(6);d.text(s.section,{size:11.5,bold:true,color:GREEN,leading:16});d.gap(5)}
   d.ensure(45);d.gap(5);d.rect(M,d.y,27,26,NAVY);d.t(String(i+1).padStart(2,'0'),M+6,d.y+6,10,true,WHITE);
   d.t('STEP '+(i+1)+(s.type?'  /  '+s.type:''),M+38,d.y+3,8,true,GREY);d.y+=27;
   d.text(s.action||'Instruction missing',{size:11.5,bold:true,leading:16,x:M+38,width:W-38});d.gap(5);
-  if(s.photo)d.photo(s.photo);
-  for(const [k,v] of [['Expected result',s.expected],['Verification',s.verify],['Method',s.verifyMethod]])d.field(k,v);
+  if(s.photo){d.photo(s.photo);if(s.photoCaption){d.text(s.photoCaption,{size:8.5,color:GREY,leading:12});d.gap(4)}}
+  if(s.sourcePage)d.field('Reference SOP source page',s.sourcePage);
+  for(const [k,v] of [['Expected result',s.expected],['Verification',s.verify],['Method',s.verifyMethod==='Visual check'?'':s.verifyMethod]])d.field(k,v);
   if(s.warning)d.note('CAUTION: '+s.warning,'warning');
   d.gap(5);d.line(M,d.y,RIGHT,d.y,[.82,.87,.89]);d.gap(7);
  }

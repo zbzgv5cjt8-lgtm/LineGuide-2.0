@@ -30,3 +30,4 @@ jobs:
           python -m pytest -q -m group2 tests/test_lineguide_e2e.py
           python -m pytest -q -m group3 tests/test_lineguide_e2e.py
           python -m pytest -q -m group4 tests/test_lineguide_e2e.py
+          python -m pytest -q -m group5 tests/test_lineguide_e2e.py

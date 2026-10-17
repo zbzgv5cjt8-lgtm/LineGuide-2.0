@@ -1,5 +1,5 @@
 /* Offline shell only; procedure data is stored separately in the browser. */
-const CACHE='lineguide-shell-v2-7-pdf';
+const CACHE='lineguide-shell-v2-8-palletiser';
 const CORE=['./','./index.html','./app.js','./pdf-export.js','./manifest.json'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
@@ -19,7 +19,7 @@ self.addEventListener('fetch',event=>{
     }).catch(()=>caches.match('./index.html')));
     return;
   }
-  const isCore=['index.html','app.js','manifest.json'].some(f=>path.endsWith('/'+f));
+  const isCore=['index.html','app.js','pdf-export.js','manifest.json'].some(f=>path.endsWith('/'+f));
   // Prefer fresh app code when online. Cached assets remain available offline.
   event.respondWith(fetch(req).then(response=>{
     if(isCore&&response.ok){
