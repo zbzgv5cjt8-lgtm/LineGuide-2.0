@@ -124,6 +124,22 @@ function stepChoice(name,value,values,label){
 }
 
 const photosafe=s=>typeof s==='string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s);
+// A data URL prefix alone does not mean an image survived an import.
+function photoDataValid(value){
+ if(!photosafe(value))return false;
+ const encoded=value.slice(value.indexOf(',')+1);
+ if(encoded.length<32||encoded.length%4===1)return false;
+ try{
+  const sample=encoded.slice(0,Math.min(120,encoded.length));
+  const head=atob(sample.slice(0,sample.length-(sample.length%4)));
+  const b=n=>head.charCodeAt(n),mime=value.slice(11,value.indexOf(';')).toLowerCase();
+  if(mime==='jpeg')return b(0)===255&&b(1)===216&&b(2)===255;
+  if(mime==='png')return b(0)===137&&head.slice(1,4)==='PNG';
+  if(mime==='gif')return head.startsWith('GIF87a')||head.startsWith('GIF89a');
+  if(mime==='webp')return head.startsWith('RIFF')&&head.slice(8,12)==='WEBP';
+  return false;
+ }catch{return false}
+}
 const jsoncopy=x=>JSON.parse(JSON.stringify(x));
 function storedDraft(){
  try{const raw=localStorage.getItem(DRAFT_KEY);if(!raw)return null;const d=JSON.parse(raw);
@@ -190,7 +206,7 @@ function compressProcedurePhoto(file){
  });
 }
 function normaliseRisk(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid risk entry');let r={};for(const k of ['hazard','harm','people','controls','actions'])r[k]=typeof v[k]==='string'?v[k].slice(0,10000):'';return r}
-function normaliseStep(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid instruction step');let r={};for(let k of ['action','expected','verify','warning','type','verifyMethod','section','sourcePage','photoCaption'])r[k]=typeof v[k]==='string'?v[k].slice(0,30000):'';r.photo=photosafe(v.photo)?v.photo:'';return r}
+function normaliseStep(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid instruction step');let r={};for(let k of ['action','expected','verify','warning','type','verifyMethod','section','sourcePage','photoCaption'])r[k]=typeof v[k]==='string'?v[k].slice(0,30000):'';if(v.photo!==undefined&&v.photo!==null&&v.photo!==''){if(!photoDataValid(v.photo))throw Error('An embedded procedure photograph is invalid or damaged. No photographs have been discarded; correct the source file and import again.');r.photo=v.photo}else r.photo='';return r}
 function normaliseProcedure(v,depth=0){
   if(!v||typeof v!=='object'||Array.isArray(v)||typeof v.id!=='string'||!v.id.trim()||v.id.length>150||typeof v.title!=='string'||!v.title.trim())throw Error('Invalid procedure');
   if(!Array.isArray(v.steps)||v.steps.length>300)throw Error('Invalid steps');
@@ -375,6 +391,7 @@ function validateAllFields(fields){
    alert('Add the approved isolation or safe-state reference for this task.');return false
  }
  if(fields.templateType===TEMPLATES[1]){
+  if(!['existing','new'].includes(fields.riskAssessmentMode)){alert('Choose a recognised risk assessment method: existing approved assessment or new task-specific assessment.');return false}
   if(fields.riskAssessmentMode==='existing'&&!String(fields.riskAssessmentRef||'').trim()){alert('An SWP needs an approved risk assessment reference, or a new task-specific assessment.');return false}
   if(fields.riskAssessmentMode==='existing'&&!String(fields.riskControls||'').trim()){alert('The SWP must include the applicable task-specific risk controls.');return false}
   if(fields.riskAssessmentMode==='new'&&(!Array.isArray(fields.riskEntries)||!fields.riskEntries.length||fields.riskEntries.some(r=>!r.hazard?.trim()||!r.harm?.trim()||!r.people?.trim()||!r.controls?.trim()))){alert('Complete the task-specific risk assessment before saving.');return false}
@@ -489,8 +506,9 @@ function preview(){
    p.isolationMode==='required'?`<div class="docnotice"><strong>Isolation required</strong><p>${esc(p.isolation||'Approved reference not specified')}</p></div>`:
    p.isolationMode==='other'?`<div class="docnotice"><strong>Other approved safe-state arrangement</strong><p>${esc(p.isolation||'Reference not specified')}</p></div>`:
    `<div class="warning">Isolation / safe-state classification not recorded (older document). Confirm before use.</div>`;
- const steps=(p.steps||[]).map((st,i,all)=>`${st.section&&(!i||st.section!==all[i-1].section)?`<h3 class="docactivity">${esc(st.section)}</h3>`:''}<section class="docstep"><div class="docstepheader"><span class="docstepnumber">${String(i+1).padStart(2,'0')}</span><div><span class="docstepcaption">STEP ${i+1}${st.type?' · '+esc(st.type):''}</span><div class="docstepaction">${esc(st.action||'Instruction missing')}</div></div></div>${st.photo&&photosafe(st.photo)?`<img src="${esc(st.photo)}" alt="Equipment reference for step ${i+1}" class="docphoto">${st.photoCaption?`<p class="docphotocaption">${esc(st.photoCaption)}</p>`:''}`:''}${st.sourcePage?`<p class="docsource">Source document page ${esc(st.sourcePage)}</p>`:''}${paragraph('Expected result',st.expected)}${paragraph('Verification',st.verify)}${st.verifyMethod&&st.verifyMethod!=='Visual check'?paragraph('Method',st.verifyMethod):''}${st.warning?`<div class="docwarning"><strong>Caution:</strong> ${esc(st.warning)}</div>`:''}</section>`).join('');
- return `${archived?'<div class="warning"><strong>ARCHIVED REVISION — FOR REFERENCE ONLY.</strong> Not the current controlled document.</div>':''}<div class="toolbar no-print"><button class="btn secondary" data-action="open" data-id="${esc(base.id)}">← Document details</button><button class="btn green" data-action="save-pdf">Save / Share PDF</button>${runningAsApp?'':'<button class="btn secondary" data-action="print-browser">Print in Safari</button>'}</div>
+ const attachedPhotos=(p.steps||[]).filter(step=>!!step.photo).length;
+ const steps=(p.steps||[]).map((st,i,all)=>`${st.section&&(!i||st.section!==all[i-1].section)?`<h3 class="docactivity">${esc(st.section)}</h3>`:''}<section class="docstep"><div class="docstepheader"><span class="docstepnumber">${String(i+1).padStart(2,'0')}</span><div><span class="docstepcaption">STEP ${i+1}${st.type?' · '+esc(st.type):''}</span><div class="docstepaction">${esc(st.action||'Instruction missing')}</div></div></div>${st.photo&&photoDataValid(st.photo)?`<img src="${esc(st.photo)}" alt="Equipment reference for step ${i+1}" class="docphoto">${st.photoCaption?`<p class="docphotocaption">${esc(st.photoCaption)}</p>`:''}`:st.photo?`<div class="docwarning">The photograph for step ${i+1} is damaged or unavailable. Please replace it before approval.</div>`:''}${st.sourcePage?`<p class="docsource">Source document page ${esc(st.sourcePage)}</p>`:''}${paragraph('Expected result',st.expected)}${paragraph('Verification',st.verify)}${st.verifyMethod&&st.verifyMethod!=='Visual check'?paragraph('Method',st.verifyMethod):''}${st.warning?`<div class="docwarning"><strong>Caution:</strong> ${esc(st.warning)}</div>`:''}</section>`).join('');
+ return `${archived?'<div class="warning"><strong>ARCHIVED REVISION — FOR REFERENCE ONLY.</strong> Not the current controlled document.</div>':''}<div class="toolbar no-print"><button class="btn secondary" data-action="open" data-id="${esc(base.id)}">← Document details</button><button class="btn green" data-action="save-pdf">Save / Share PDF</button><span class="small" aria-label="Embedded photograph count">${attachedPhotos} ${attachedPhotos===1?'photograph':'photographs'} attached</span>${runningAsApp?'':'<button class="btn secondary" data-action="print-browser">Print in Safari</button>'}</div>
  <article class="panel preview docpreview"><div class="docmasthead"><div><div class="docbrand">LINEGUIDE</div><div class="docsubbrand">ENGINEERING PROCEDURES</div></div><div class="doctypelabel">${esc(docType)} · ${archived?'ARCHIVED':esc(p.status||'Draft')}</div></div>
  <h1>${esc(p.title)}</h1><div class="docmetagrid"><div><small>DOCUMENT</small><strong>${esc(documentNumber)}</strong></div><div><small>REVISION</small><strong>${revLabel(p.revision)}</strong></div><div><small>SITE</small><strong>${esc(p.site||'—')}</strong></div><div><small>LINE / ASSET</small><strong>${esc([p.line,p.asset].filter(Boolean).join(' · ')||'—')}</strong></div></div>
  ${p.status!=='Approved'||archived?`<div class="docwarning"><strong>${archived?'HISTORICAL DOCUMENT — REFERENCE ONLY':'DRAFT / UNAPPROVED — NOT FOR OPERATIONAL USE'}</strong></div>`:''}
@@ -518,7 +536,8 @@ function importData(openSingle=false){
      if(obj?.app!=='LineGuide'||obj?.version!==1)throw Error('Not a supported LineGuide backup');
      const incoming=validateImport(obj.procedures),map=new Map(data.map(p=>[p.id,p]));
      const matches=incoming.filter(p=>map.has(p.id)).length;
-     if(!confirm(`Import ${incoming.length} prepared procedures? ${matches} existing records with matching IDs will be replaced. Export a backup first.`))return;
+     const photoCount=incoming.reduce((total,p)=>total+(p.steps||[]).filter(step=>!!step.photo).length,0);
+     if(!confirm(`Import ${incoming.length} prepared ${incoming.length===1?'procedure':'procedures'} with ${photoCount} embedded ${photoCount===1?'photograph':'photographs'}? ${matches} existing records with matching IDs will be replaced. Export a backup first.`))return;
      for(let p of incoming)map.set(p.id,p);
      const next=[...map.values()];if(persist(next)){const maxImported=Math.max(0,Number(obj.documentSequence)||0,...next.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported)))}catch{}if(openSingle&&incoming.length===1){currentId=incoming[0].id;currentRevisionIndex=null;nav('preview')}else nav('library')}
    }catch(e){alert('Import cancelled: '+(e.message||'Invalid backup')+'. Your saved library is unchanged.')}
