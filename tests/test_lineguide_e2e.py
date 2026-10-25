@@ -750,3 +750,65 @@ def test_prepared_procedure_import_and_revision_is_asset_neutral(app):
  version=getdata(pg)[0]
  assert version['revision']=='1.1' and version['revisionHistory'][0]['steps'][1]['section']=='Completion'
  assert not errors
+
+# QA 25 Oct 2026: source images must survive import, and bad photos must not disappear silently.
+@pytest.mark.group5
+def test_prepared_photo_import_remains_visible_in_pdf_and_revision(app):
+ import base64
+ from io import BytesIO
+ from PIL import Image
+ import fitz
+ pg,_,errors,dialogs=app
+ buf=BytesIO()
+ Image.new('RGB',(120,80),'#5a923c').save(buf,format='JPEG')
+ photo='data:image/jpeg;base64,'+base64.b64encode(buf.getvalue()).decode()
+ doc={'id':'photo-import-synthetic','title':'Prepared photo proof','site':'Test Site',
+ 'line':'Test line','asset':'Test machine','templateType':SOP,'purpose':'Fictional QA',
+ 'prerequisites':'Consult site-approved information','isolationMode':'not-required',
+ 'owner':'QA Author','status':'Draft','revision':'1.0','finalChecks':'Check completed',
+ 'steps':[{'action':'Examine test reference','expected':'Reference identified','photo':photo,'photoCaption':'First test photo'},
+          {'action':'Check test reference','expected':'Reference confirmed','photo':photo,'photoCaption':'Second test photo'}]}
+ with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
+ chooser.value.set_files({'name':'prepared-photos.json','mimeType':'application/json','buffer':json.dumps({'app':'LineGuide','version':1,'procedures':[doc]}).encode()})
+ pg.locator('.docphoto').first.wait_for(timeout=6000)
+ assert pg.locator('.docphoto').count()==2
+ assert pg.locator('.docphoto').evaluate_all('els=>els.every(e=>e.complete&&e.naturalWidth>0)')
+ assert len([s for s in getdata(pg)[0]['steps'] if s.get('photo')])==2
+ assert any('2 photographs' in msg for msg in dialogs)
+ with pg.expect_download() as info:pg.locator('[data-action=save-pdf]').click()
+ pdf=fitz.open(info.value.path())
+ assert sum(len(pdf.get_page_images(i)) for i in range(len(pdf)))==2
+ pg.locator('[data-action=open]').click()
+ pg.locator('[data-action=edit]').click()
+ for _ in range(3):pg.locator('#nextBtn').click()
+ pg.locator('[name=changeNote]').fill('Image retention audit')
+ pg.locator('#nextBtn').click()
+ updated=getdata(pg)[0]
+ assert sum(bool(s.get('photo')) for s in updated['steps'])==2
+ assert sum(bool(s.get('photo')) for s in updated['revisionHistory'][0]['steps'])==2
+ assert not errors
+
+@pytest.mark.group5
+def test_invalid_photo_import_rejected_instead_of_silently_discarded(app):
+ import base64
+ pg,_,errors,dialogs=app
+ before=getdata(pg)
+ invalid='data:image/jpeg;base64,'+base64.b64encode(b'not an actual image, intentionally'*3).decode()
+ doc={'id':'bad-photo','title':'Photo rejected','steps':[{'action':'Fake','expected':'Fake','photo':invalid}]}
+ with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
+ chooser.value.set_files({'name':'invalid-photo.json','mimeType':'application/json','buffer':json.dumps({'app':'LineGuide','version':1,'procedures':[doc]}).encode()})
+ for _ in range(50):
+  if any('Import cancelled' in msg for msg in dialogs):break
+  pg.wait_for_timeout(100)
+ assert any('photograph' in msg.lower() and 'import cancelled' in msg.lower() for msg in dialogs)
+ assert getdata(pg)==before
+ assert not errors
+
+@pytest.mark.group5
+def test_swp_approval_validation_rejects_unrecognised_risk_method(app):
+ pg,_,errors,dialogs=app
+ p=prepare_one(pg,'Risk method must be recognised',swp=True)
+ accepted=pg.evaluate('(p)=>validateAllFields({...p,riskAssessmentMode:"unknown-mode"})',p)
+ assert accepted is False
+ assert any('risk assessment method' in msg.lower() for msg in dialogs)
+ assert not errors
