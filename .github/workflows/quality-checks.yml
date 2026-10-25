@@ -19,7 +19,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-test.txt
-          python -m playwright install --with-deps chromium
+          python -m playwright install --with-deps chromium webkit
       - name: Syntax check
         run: |
           node --check app.js
@@ -31,3 +31,4 @@ jobs:
           python -m pytest -q -m group3 tests/test_lineguide_e2e.py
           python -m pytest -q -m group4 tests/test_lineguide_e2e.py
           python -m pytest -q -m group5 tests/test_lineguide_e2e.py
+          python -m pytest -q tests/test_lineguide_webkit.py
