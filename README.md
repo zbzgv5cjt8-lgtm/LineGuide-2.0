@@ -1,6 +1,10 @@
-# LineGuide v3.0 — Shared Photo Library
+# LineGuide v3.1 — Simple SOP Creator
 
-LineGuide remains a **general-purpose, local-first SOP/SWP creator**. It has no equipment-specific forms or hard-coded palletiser content.
+LineGuide creates **Standard Operating Procedures (SOPs) only**. The single guided flow covers identification, task-specific safety and preparation, numbered instructions with photographs, and document review. It does not offer SWP creation or a risk-assessment authoring wizard.
+
+Older SWP records already saved or imported remain **read-only** for reference and PDF export. The app does not delete them or silently change their document type. Existing photo references, historical revisions and backups are preserved.
+
+LineGuide remains a **general-purpose, local-first SOP creator**. It has no equipment-specific forms or hard-coded palletiser content.
 
 ## Photo storage and document revisions
 
@@ -14,7 +18,7 @@ LineGuide remains a **general-purpose, local-first SOP/SWP creator**. It has no 
 ## First-upgrade checklist
 
 1. **Before upgrading, export an existing JSON backup** using the old app if you have procedures stored locally.
-2. Open v3.0 and allow the migration screen to complete. Do not clear Safari data or uninstall the app during migration.
+2. Open v3.1 and allow the migration screen to complete. Do not clear Safari data or uninstall the app during migration.
 3. Open a procedure with images and check the photo count, preview, and Save / Share PDF.
 4. Open an archived revision and verify its images.
 5. Export a **new full v2 backup**, which can restore the images and revision history on another supported browser.
@@ -23,7 +27,7 @@ In-browser approval names are still prototype records, not authenticated electro
 
 ---
 
-LineGuide is a general-purpose, local-first SOP / SWP creator and document library. There are **no machine-specific authoring modes**, built-in palletiser forms, site-specific question lists or preloaded operational procedures.
+LineGuide is a general-purpose, local-first SOP creator and document library. There are **no machine-specific authoring modes**, built-in palletiser forms, site-specific question lists or preloaded operational procedures.
 
 ## Two ways to use LineGuide
 
@@ -33,18 +37,18 @@ LineGuide is a general-purpose, local-first SOP / SWP creator and document libra
 3. Choose a privately provided LineGuide `.json` document from Files.
 4. Confirm the import; a one-document import opens immediately in the full-document preview. Review its steps, photos, section headings, document status and PDF export.
 
-**Create a new document:**
-1. Home → **Create procedure**.
-2. Follow Identify → Requirements → Instructions → Review.
-3. Use short dropdowns with Other entries, conditional isolation and risk-assessment questions, and numbered steps.
-4. Optional **Activity / section** helps group any longer SOP/SWP, with re-usable choices from that document. Optional source-page and photo fields work with any source reference.
+**Create a new SOP:**
+1. Home → **Create SOP**.
+2. Follow Identify → Safety & preparation → Instructions → Review.
+3. Use short dropdowns with Other entries, task-dependent isolation and an optional approved risk assessment reference, and numbered steps.
+4. Optional **Activity / section** helps group any longer SOP, with re-usable choices from that document. Optional source-page and photo fields work with any source reference.
 5. Save and access through Home → Library or Browse (site → line → asset → task); export professional PDF, retain revisions and take JSON backups.
 
 The Library also offers **Import procedures** for merging multiple backed-up records. Import and export act on device-local data; the repository does not contain procedures.
 
 ## Private source-document recreation
 
-A privately supplied reference document can be re-created as an ordinary LineGuide procedure **outside** the GitHub repository, using the identical record format as any user-created SOP/SWP. Its JSON can be imported in a single step. The app itself must not require an author to re-enter that document, or include hard-coded document-specific controls.
+A privately supplied reference document can be re-created as an ordinary LineGuide procedure **outside** the GitHub repository, using the identical record format as any user-created SOP. Its JSON can be imported in a single step. The app itself must not require an author to re-enter that document, or include hard-coded document-specific controls.
 
 Never publish equipment images, company instructions, access credentials or other sensitive operational materials in this public repo. Prepared private test data and source PDFs are **not** checked into GitHub.
 
