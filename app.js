@@ -206,7 +206,7 @@ function compressProcedurePhoto(file){
  });
 }
 function normaliseRisk(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid risk entry');let r={};for(const k of ['hazard','harm','people','controls','actions'])r[k]=typeof v[k]==='string'?v[k].slice(0,10000):'';return r}
-function normaliseStep(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid instruction step');let r={};for(let k of ['action','expected','verify','warning','type','verifyMethod','section','sourcePage','photoCaption'])r[k]=typeof v[k]==='string'?v[k].slice(0,30000):'';if(v.photo!==undefined&&v.photo!==null&&v.photo!==''){if(!photoDataValid(v.photo))throw Error('An embedded procedure photograph is invalid or damaged. No photographs have been discarded; correct the source file and import again.');r.photo=v.photo}else r.photo='';return r}
+function normaliseStep(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid instruction step');let r={};for(let k of ['action','expected','verify','warning','type','verifyMethod','section','sourcePage','photoCaption'])r[k]=typeof v[k]==='string'?v[k].slice(0,30000):'';if(v.photo!==undefined&&v.photo!==null&&v.photo!==''){if(!photoDataValid(v.photo)&&!window.LineGuidePhotos?.isRef(v.photo))throw Error('An embedded procedure photograph is invalid or damaged. No photographs have been discarded; correct the source file and import again.');r.photo=v.photo}else r.photo='';return r}
 function normaliseProcedure(v,depth=0){
   if(!v||typeof v!=='object'||Array.isArray(v)||typeof v.id!=='string'||!v.id.trim()||v.id.length>150||typeof v.title!=='string'||!v.title.trim())throw Error('Invalid procedure');
   if(!Array.isArray(v.steps)||v.steps.length>300)throw Error('Invalid steps');
@@ -272,7 +272,7 @@ function stepEditor(s={},i){
  ${stepChoice('verifyMethod',s.verifyMethod||'',VERIFY_METHODS,'Verification approach')}
  <div class="field"><label>Verification details</label><textarea data-step="verify" placeholder="How is the expected result checked? Use approved criteria.">${esc(s.verify||'')}</textarea></div>
  <div class="field"><label>Warning / caution (if relevant)</label><textarea data-step="warning" placeholder="Task-specific warning from approved sources…">${esc(s.warning||'')}</textarea></div>
- <div class="field"><label>Photo / visual reference (optional)</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" src="${photosafe(s.photo)?esc(s.photo):''}" alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="field"><label>Photo caption</label><input data-step="photoCaption" value="${esc(s.photoCaption||'')}" placeholder="Identify the control or screen shown"></div></div>
+ <div class="field"><label>Photo / visual reference (optional)</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" ${window.LineGuidePhotos.isRef(s.photo)?`data-photo-ref="${esc(s.photo)}"`:`src="${photosafe(s.photo)?esc(s.photo):''}"`} alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="field"><label>Photo caption</label><input data-step="photoCaption" value="${esc(s.photoCaption||'')}" placeholder="Identify the control or screen shown"></div></div>
  <div class="field"><label>Reference document page (optional)</label><input data-step="sourcePage" value="${esc(s.sourcePage||'')}" placeholder="e.g. 3 or 4–5"></div>
  </details>`}
 
@@ -477,10 +477,10 @@ function wireBuilder(){
      const file=fi.files?.[0];if(!file)return;
      if(!file.type.startsWith('image/')||file.size>18*1024*1024){alert('Choose an image under 18 MB. The app will resize it to save storage space.');fi.value='';return}
      captureSteps();captureForm();const index=Number(box.dataset.stepIndex);
-     compressProcedurePhoto(file).then(photo=>{
+     compressProcedurePhoto(file).then(photo=>window.LineGuidePhotos.put(photo)).then(ref=>{
        if(!stepDrafts[index])return;
-       stepDrafts[index].photo=photo;builderDirty=true;render();queueDraftSave();
-     }).catch(err=>alert(err.message||'Unable to process photo.'));
+       stepDrafts[index].photo=ref;builderDirty=true;render();queueDraftSave();
+     }).catch(err=>alert('Photograph was not added: '+(err.message||'Unable to store image.')+'. Existing photos are unchanged.'));
    };
  });
 }
@@ -507,7 +507,7 @@ function preview(){
    p.isolationMode==='other'?`<div class="docnotice"><strong>Other approved safe-state arrangement</strong><p>${esc(p.isolation||'Reference not specified')}</p></div>`:
    `<div class="warning">Isolation / safe-state classification not recorded (older document). Confirm before use.</div>`;
  const attachedPhotos=(p.steps||[]).filter(step=>!!step.photo).length;
- const steps=(p.steps||[]).map((st,i,all)=>`${st.section&&(!i||st.section!==all[i-1].section)?`<h3 class="docactivity">${esc(st.section)}</h3>`:''}<section class="docstep"><div class="docstepheader"><span class="docstepnumber">${String(i+1).padStart(2,'0')}</span><div><span class="docstepcaption">STEP ${i+1}${st.type?' · '+esc(st.type):''}</span><div class="docstepaction">${esc(st.action||'Instruction missing')}</div></div></div>${st.photo&&photoDataValid(st.photo)?`<img src="${esc(st.photo)}" alt="Equipment reference for step ${i+1}" class="docphoto">${st.photoCaption?`<p class="docphotocaption">${esc(st.photoCaption)}</p>`:''}`:st.photo?`<div class="docwarning">The photograph for step ${i+1} is damaged or unavailable. Please replace it before approval.</div>`:''}${st.sourcePage?`<p class="docsource">Source document page ${esc(st.sourcePage)}</p>`:''}${paragraph('Expected result',st.expected)}${paragraph('Verification',st.verify)}${st.verifyMethod&&st.verifyMethod!=='Visual check'?paragraph('Method',st.verifyMethod):''}${st.warning?`<div class="docwarning"><strong>Caution:</strong> ${esc(st.warning)}</div>`:''}</section>`).join('');
+ const steps=(p.steps||[]).map((st,i,all)=>`${st.section&&(!i||st.section!==all[i-1].section)?`<h3 class="docactivity">${esc(st.section)}</h3>`:''}<section class="docstep"><div class="docstepheader"><span class="docstepnumber">${String(i+1).padStart(2,'0')}</span><div><span class="docstepcaption">STEP ${i+1}${st.type?' · '+esc(st.type):''}</span><div class="docstepaction">${esc(st.action||'Instruction missing')}</div></div></div>${st.photo&&(photoDataValid(st.photo)||window.LineGuidePhotos.isRef(st.photo))?`<img ${window.LineGuidePhotos.isRef(st.photo)?`data-photo-ref="${esc(st.photo)}"`:`src="${esc(st.photo)}"`} alt="Equipment reference for step ${i+1}" class="docphoto">${st.photoCaption?`<p class="docphotocaption">${esc(st.photoCaption)}</p>`:''}`:st.photo?`<div class="docwarning">The photograph for step ${i+1} is damaged or unavailable. Please replace it before approval.</div>`:''}${st.sourcePage?`<p class="docsource">Source document page ${esc(st.sourcePage)}</p>`:''}${paragraph('Expected result',st.expected)}${paragraph('Verification',st.verify)}${st.verifyMethod&&st.verifyMethod!=='Visual check'?paragraph('Method',st.verifyMethod):''}${st.warning?`<div class="docwarning"><strong>Caution:</strong> ${esc(st.warning)}</div>`:''}</section>`).join('');
  return `${archived?'<div class="warning"><strong>ARCHIVED REVISION — FOR REFERENCE ONLY.</strong> Not the current controlled document.</div>':''}<div class="toolbar no-print"><button class="btn secondary" data-action="open" data-id="${esc(base.id)}">← Document details</button><button class="btn green" data-action="save-pdf">Save / Share PDF</button><span class="small" aria-label="Embedded photograph count">${attachedPhotos} ${attachedPhotos===1?'photograph':'photographs'} attached</span>${runningAsApp?'':'<button class="btn secondary" data-action="print-browser">Print in Safari</button>'}</div>
  <article class="panel preview docpreview"><div class="docmasthead"><div><div class="docbrand">LINEGUIDE</div><div class="docsubbrand">ENGINEERING PROCEDURES</div></div><div class="doctypelabel">${esc(docType)} · ${archived?'ARCHIVED':esc(p.status||'Draft')}</div></div>
  <h1>${esc(p.title)}</h1><div class="docmetagrid"><div><small>DOCUMENT</small><strong>${esc(documentNumber)}</strong></div><div><small>REVISION</small><strong>${revLabel(p.revision)}</strong></div><div><small>SITE</small><strong>${esc(p.site||'—')}</strong></div><div><small>LINE / ASSET</small><strong>${esc([p.line,p.asset].filter(Boolean).join(' · ')||'—')}</strong></div></div>
@@ -565,7 +565,14 @@ function act(a,pid,idx){
    }
    return;
  }
- if(a==='save-pdf'){window.LineGuidePdf.exportProcedurePdf();return}
+ if(a==='save-pdf'){
+  const record=data.find(p=>p.id===currentId);
+  const view=currentRevisionIndex===null?record:record?.revisionHistory?.[currentRevisionIndex];
+  if(!view){alert('The selected procedure is unavailable.');return}
+  try{window.LineGuidePdf.exportProcedurePdf(window.LineGuidePhotos.materializeCached(view))}
+  catch(err){alert('PDF export unavailable: '+err.message)}
+  return;
+ }
  if(a==='print-browser'){window.LineGuidePdf.browserPrint();return}
  if(a==='raw-recovery'){downloadRaw();return}
  if(a==='export'){exportData();return}
@@ -581,6 +588,7 @@ function render(){
  if(page==='builder')app.innerHTML=builder();
  if(page==='detail')app.innerHTML=detail();
  if(page==='preview')app.innerHTML=preview();
+ window.LineGuidePhotos.attach(app);
  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
  wire();
 }
@@ -600,7 +608,30 @@ function wire(){
  const sf=$('#statusFilter');if(sf){sf.value=filterStatus;sf.addEventListener('change',()=>{filterStatus=sf.value;render()})}
  if(page==='builder')wireBuilder();
 }
-load();if(location.hash.startsWith('#procedure=')){try{currentId=decodeURIComponent(location.hash.slice(11));page='detail'}catch{page='home'}}render();
+async function initialisePhotoStorage(){
+ load();
+ if(loadProblem){render();return}
+ try{
+  if(window.LineGuidePhotos.hasInline(data)){
+   const migrated=await window.LineGuidePhotos.convertProcedures(data);
+   if(!persist(migrated))throw new Error('Photo migration could not save the updated procedure references.');
+  }
+  // Older unfinished drafts can also contain repeated inline images.
+  const unfinished=storedDraft();
+  if(unfinished&&window.LineGuidePhotos.hasInline([{steps:unfinished.stepDrafts||[]}])){
+   const converted=await window.LineGuidePhotos.convertProcedures([{steps:unfinished.stepDrafts||[]}]);
+   unfinished.stepDrafts=converted[0].steps;
+   localStorage.setItem(DRAFT_KEY,JSON.stringify(unfinished));
+  }
+ }catch(err){
+  console.error('LineGuide photo migration failed',err);
+  alert('Photograph migration could not finish: '+(err.message||'Storage unavailable')+'. Your original records have not been erased. Export a backup and check browser storage.');
+ }
+ if(location.hash.startsWith('#procedure=')){try{currentId=decodeURIComponent(location.hash.slice(11));page='detail'}catch{page='home'}}
+ render();
+}
+$('#app').innerHTML='<section class="panel"><h2>Opening LineGuide</h2><p>Checking and preserving your procedure photographs…</p></section>';
+initialisePhotoStorage();
 function updateConnection(){let el=$('#connectionBadge');if(el)el.textContent=navigator.onLine?'● Online':'● Offline'}window.addEventListener('online',updateConnection);window.addEventListener('offline',updateConnection);updateConnection();
 if('serviceWorker'in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 
