@@ -8,6 +8,7 @@
 const DB='lineguide-shared-photos-v1', STORE='images';
 const REF=/^idb:sha256:[0-9a-f]{64}$/;
 const cache=new Map();
+const pinned=new Set(); // Images in the currently visible SOP/SWP remain available for PDF export.
 let opening=null;
 const isRef=value=>typeof value==='string'&&REF.test(value);
 const isInline=value=>typeof value==='string'&&/^data:image\/(?:jpeg|png|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(value);
@@ -15,7 +16,11 @@ const isInline=value=>typeof value==='string'&&/^data:image\/(?:jpeg|png|gif|web
 function remember(ref,uri){
  if(cache.has(ref))cache.delete(ref);
  cache.set(ref,uri);
- while(cache.size>25)cache.delete(cache.keys().next().value);
+ while(cache.size>25){
+  const evictable=[...cache.keys()].find(key=>!pinned.has(key));
+  if(!evictable)break; // Larger current procedures need their images ready for synchronous iPhone sharing.
+  cache.delete(evictable);
+ }
 }
 function open(){
  if(opening)return opening;
@@ -137,6 +142,7 @@ async function prepareImport(records,version,images){
 }
 function attach(root=document){
  const nodes=[...root.querySelectorAll('img[data-photo-ref]')];
+ pinned.clear();for(const node of nodes)if(isRef(node.dataset.photoRef))pinned.add(node.dataset.photoRef);
  const button=root.querySelector('[data-action="save-pdf"]');
  if(button&&nodes.length){button.disabled=true;button.textContent='Loading photographs…'}
  if(!nodes.length)return Promise.resolve();
