@@ -1,5 +1,14 @@
 # LineGuide changelog
 
+## v3.1 — SOP-only guided authoring (26 October 2026)
+- Removed the template picker; all newly created and revised documents are SOPs.
+- Removed the SWP-specific risk assessment method and hazard-by-hazard editor from the guided flow.
+- Kept one optional approved risk-assessment reference and existing task-specific safety and isolation fields.
+- Updated Home and Library wording and clarified the four creation stages.
+- Preserved imported and previously saved SWPs for read-only preview, history and PDF export; they cannot be silently converted.
+- Retained IndexedDB shared photographs, portable backups and revision history.
+- Updated automated regressions for SOP-only creation, optional RA references, and preservation of legacy SWP records.
+
 ## v3.0 — IndexedDB shared photo library (26 October 2026)
 - Deduplicated immutable photographs across all procedure revisions using SHA-256 references.
 - Lazy rendering of step photographs for current and archived revisions.
