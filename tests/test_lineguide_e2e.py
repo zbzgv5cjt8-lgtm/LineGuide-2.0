@@ -826,3 +826,102 @@ def test_swp_approval_validation_rejects_unrecognised_risk_method(app):
  assert accepted is False
  assert any('risk assessment method' in msg.lower() for msg in dialogs)
  assert not errors
+
+
+# v3 shared-photo architecture. All images are synthetic; no company material.
+@pytest.mark.group5
+def test_legacy_image_migration_deduplicates_revisions_and_preserves_pdf(app):
+ import base64
+ from io import BytesIO
+ from PIL import Image
+ import fitz
+ pg,_,errors,_=app
+ image=Image.new('RGB',(180,110),'#3d6f92')
+ buf=BytesIO();image.save(buf,format='JPEG')
+ photo='data:image/jpeg;base64,'+base64.b64encode(buf.getvalue()).decode()
+ doc={'id':'migrated-legacy','title':'Legacy archive with repeated photo',
+      'templateType':SOP,'site':'Site','line':'Test line','asset':'Demo',
+      'purpose':'Migration regression','prerequisites':'QA only',
+      'owner':'Test author','finalChecks':'Test only','status':'Draft',
+      'revision':'1.2','isolationMode':'not-required',
+      'steps':[{'action':'Inspect synthetic JPEG','expected':'Picture present','photo':photo}],
+      'revisionHistory':[
+        {'id':'migrated-legacy','title':'Old 1.1','status':'Draft','revision':'1.1','steps':[{'action':'Inspect older JPEG','expected':'Present','photo':photo}]},
+        {'id':'migrated-legacy','title':'Old 1.0','status':'Draft','revision':'1.0','steps':[{'action':'Inspect original JPEG','expected':'Present','photo':photo}]}
+      ]}
+ pg.evaluate("""doc=>{localStorage.setItem('lineguide-procedures-v1',JSON.stringify([doc]));}""",doc)
+ pg.evaluate("initialisePhotoStorage()")
+ pg.wait_for_function("""() => JSON.parse(localStorage.getItem('lineguide-procedures-v1'))[0].steps[0].photo.startsWith('idb:sha256:')""")
+ result=getdata(pg)[0]
+ ref=result['steps'][0]['photo']
+ assert all(rev['steps'][0]['photo']==ref for rev in result['revisionHistory'])
+ count=pg.evaluate("""async()=>{const db=await LineGuidePhotos.open();return new Promise((resolve,reject)=>{const r=db.transaction('images','readonly').objectStore('images').count();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}""")
+ assert count==1
+ pg.locator('[data-page=library]').click()
+ pg.locator('[data-action=preview]').click()
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => [...document.querySelectorAll('.docphoto')].every(img=>img.complete&&img.naturalWidth>0)")
+ with pg.expect_download() as file: pg.locator('[data-action=save-pdf]').click()
+ assert sum(len(p.get_images()) for p in fitz.open(file.value.path()))==1
+ pg.locator('[data-action=open]').click()
+ pg.locator('[data-action=view-revision]').first.click()
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => [...document.querySelectorAll('.docphoto')].every(img=>img.complete&&img.naturalWidth>0)")
+ assert pg.locator('.docpreview').is_visible()
+ assert not errors
+
+@pytest.mark.group5
+def test_portable_backup_has_only_one_photo_for_multiple_revisions(app):
+ import base64
+ from io import BytesIO
+ from PIL import Image
+ pg,_,errors,_=app
+ buf=BytesIO();Image.new('RGB',(96,96),'#225599').save(buf,format='JPEG')
+ photo='data:image/jpeg;base64,'+base64.b64encode(buf.getvalue()).decode()
+ doc={'id':'two-revisions','title':'Backup dedup example','site':'Site','line':'Line','asset':'Any',
+ 'templateType':SOP,'purpose':'Testing backups','prerequisites':'QA','owner':'Test author',
+ 'finalChecks':'Test pass','status':'Draft','revision':'1.1','isolationMode':'not-required',
+ 'steps':[{'action':'Current step','expected':'Present','photo':photo}],
+ 'revisionHistory':[{'id':'two-revisions','title':'Old','revision':'1.0','steps':[{'action':'Historical step','expected':'Present','photo':photo}]}]}
+ with pg.expect_file_chooser() as choose: pg.locator('[data-action=import-prepared]').click()
+ choose.value.set_files({'name':'legacy.json','mimeType':'application/json','buffer':json.dumps({'app':'LineGuide','version':1,'procedures':[doc]}).encode()})
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => document.querySelector('.docphoto')?.naturalWidth>0")
+ with pg.expect_download() as export:
+  pg.evaluate('exportData()')
+ backup=json.loads(export.value.path().read_text())
+ assert backup['version']==2
+ assert len(backup['images'])==1
+ ref=backup['procedures'][0]['steps'][0]['photo']
+ assert ref in backup['images']
+ assert ref==backup['procedures'][0]['revisionHistory'][0]['steps'][0]['photo']
+ assert backup['images'][ref].startswith('data:image/jpeg;base64,')
+ assert len(json.dumps(backup))<len(json.dumps({'procedures':[doc]}))
+ # Simulate a fresh device by clearing both metadata and original IndexedDB images.
+ pg.evaluate("""async () => {
+   const db=await LineGuidePhotos.open();
+   await new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+   localStorage.setItem('lineguide-procedures-v1','[]');
+   data=[];
+   render();
+ }""")
+ with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
+ chooser.value.set_files({'name':'portable-v2.json','mimeType':'application/json','buffer':json.dumps(backup).encode()})
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => document.querySelector('.docphoto')?.naturalWidth>0")
+ assert len(getdata(pg))==1
+ assert not errors
+
+@pytest.mark.group5
+def test_incomplete_version2_image_manifest_rejected_without_overwriting(app):
+ pg,_,errors,dialogs=app
+ before=getdata(pg)
+ ref='idb:sha256:'+'0'*64
+ doc={'id':'bad-v2','title':'Incomplete backup','steps':[{'action':'Test','expected':'Test','photo':ref}]}
+ with pg.expect_file_chooser() as choose:pg.locator('[data-action=import-prepared]').click()
+ choose.value.set_files({'name':'missing-photos.json','mimeType':'application/json',
+                         'buffer':json.dumps({'app':'LineGuide','version':2,'procedures':[doc],'images':{}}).encode()})
+ pg.wait_for_function("() => document.querySelector('#app')?.textContent.includes('Create')")
+ assert getdata(pg)==before
+ assert any('missing a photograph' in msg for msg in dialogs)
+ assert not errors
