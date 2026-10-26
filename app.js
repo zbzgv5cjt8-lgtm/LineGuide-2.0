@@ -557,7 +557,7 @@ function importData(openSingle=false){
    const next=[...map.values()];
    if(persist(next)){
     const maxImported=Math.max(0,Number(obj.documentSequence)||0,...next.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));
-    try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported))}catch{}
+    try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported)))}catch{}
     if(openSingle&&prepared.length===1){currentId=prepared[0].id;currentRevisionIndex=null;nav('preview')}
     else nav('library');
    }
