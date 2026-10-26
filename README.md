@@ -1,4 +1,27 @@
-# LineGuide v2.9 — Engineering Procedure Generator
+# LineGuide v3.0 — Shared Photo Library
+
+LineGuide remains a **general-purpose, local-first SOP/SWP creator**. It has no equipment-specific forms or hard-coded palletiser content.
+
+## Photo storage and document revisions
+
+- The first visit after upgrading scans existing records and unfinished drafts. If legacy documents contain inline JPEG, PNG, GIF or WebP photographs, the app writes immutable, SHA-256-addressed copies into an **IndexedDB image store**, then replaces each inline copy in localStorage document metadata with a small photo reference. A failed photo write leaves existing procedure metadata unchanged.
+- Duplicate pictures in current and historical revisions use a single stored image. Changing a picture creates a new image reference; the historical version retains its own photograph. Reopening an archived revision loads its images from IndexedDB.
+- PDF export uses cached photographs prepared while the procedure preview is visible. This keeps the Share PDF operation synchronous after the tap, which is important on iPhone.
+- New backups are **JSON version 2**: procedures contain image references and the backup includes an images collection with one copy per unique photograph. Imports continue to support version 1 legacy JSON. A missing or checksum-mismatched image cancels import.
+- Photo storage and procedures remain *on this device and browser*, not on GitHub. They do not automatically sync between Safari and an installed Home Screen app on every iOS configuration. Export a backup before upgrading, and regularly thereafter.
+- IndexedDB is more appropriate for binary/image data than localStorage but is not a substitute for off-device backups; browsers may evict local website data. No automatic deletion of unreferenced photographs is performed until a safe audited cleanup flow exists.
+
+## First-upgrade checklist
+
+1. **Before upgrading, export an existing JSON backup** using the old app if you have procedures stored locally.
+2. Open v3.0 and allow the migration screen to complete. Do not clear Safari data or uninstall the app during migration.
+3. Open a procedure with images and check the photo count, preview, and Save / Share PDF.
+4. Open an archived revision and verify its images.
+5. Export a **new full v2 backup**, which can restore the images and revision history on another supported browser.
+
+In-browser approval names are still prototype records, not authenticated electronic signatures. A reconstructed procedure is not site-approved until reviewed through the organisation's controlled document system. Do not use this prototype as the only source of workplace safety instructions.
+
+---
 
 LineGuide is a general-purpose, local-first SOP / SWP creator and document library. There are **no machine-specific authoring modes**, built-in palletiser forms, site-specific question lists or preloaded operational procedures.
 
