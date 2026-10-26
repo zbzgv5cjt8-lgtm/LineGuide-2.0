@@ -859,6 +859,7 @@ def test_legacy_image_migration_deduplicates_revisions_and_preserves_pdf(app):
  count=pg.evaluate("""async()=>{const db=await LineGuidePhotos.open();return new Promise((resolve,reject)=>{const r=db.transaction('images','readonly').objectStore('images').count();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}""")
  assert count==1
  pg.locator('[data-page=library]').click()
+ pg.locator('[data-action=open]').click()
  pg.locator('[data-action=preview]').click()
  pg.locator('.docphoto').wait_for()
  pg.wait_for_function("() => [...document.querySelectorAll('.docphoto')].every(img=>img.complete&&img.naturalWidth>0)")
@@ -904,7 +905,7 @@ def test_portable_backup_has_only_one_photo_for_multiple_revisions(app):
    await new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
    localStorage.setItem('lineguide-procedures-v1','[]');
    data=[];
-   render();
+   nav('home');
  }""")
  with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
  chooser.value.set_files({'name':'portable-v2.json','mimeType':'application/json','buffer':json.dumps(backup).encode()})
@@ -922,7 +923,9 @@ def test_incomplete_version2_image_manifest_rejected_without_overwriting(app):
  with pg.expect_file_chooser() as choose:pg.locator('[data-action=import-prepared]').click()
  choose.value.set_files({'name':'missing-photos.json','mimeType':'application/json',
                          'buffer':json.dumps({'app':'LineGuide','version':2,'procedures':[doc],'images':{}}).encode()})
- pg.wait_for_function("() => document.querySelector('#app')?.textContent.includes('Create')")
+ for _ in range(50):
+  if any('missing a photograph' in msg for msg in dialogs): break
+  pg.wait_for_timeout(100)
  assert getdata(pg)==before
  assert any('missing a photograph' in msg for msg in dialogs)
  assert not errors
