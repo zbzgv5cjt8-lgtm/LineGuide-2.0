@@ -63,13 +63,7 @@ function riskEntryEditor(r={},i){
  <div class="field"><label>Further actions (if any)</label><input data-risk="actions" value="${esc(r.actions||'')}" placeholder="Leave blank if no further actions are needed"></div></div>`;
 }
 function riskAssessmentFields(d){
- const isSwp=d.templateType===TEMPLATES[1];const mode=d.riskAssessmentMode||'existing';
- return `<div class="panel" style="background:#f8fafb;padding:14px" data-risk-assessment>
- <h3>Risk assessment</h3><p class="small">An SOP should refer to the applicable approved assessment where relevant. An SWP must be supported by an approved assessment or a task-specific assessment for review.</p>
- <div data-sop-risk class="${isSwp?'hidden':''}"><div class="field"><label>Applicable risk assessment reference (if relevant)</label><input name="riskAssessmentRef" value="${esc(d.riskAssessmentRef||'')}" placeholder="Site risk assessment reference"></div></div>
- <div data-swp-risk class="${isSwp?'':'hidden'}"><div class="field"><label>How are the risks assessed? *</label><select name="riskAssessmentMode" data-risk-mode><option value="existing" ${mode==='existing'?'selected':''}>Reference an existing approved assessment</option><option value="new" ${mode==='new'?'selected':''}>Create a task-specific assessment</option></select></div>
- <div data-risk-existing class="${mode==='existing'?'':'hidden'}"><div class="field"><label>Approved risk assessment reference *</label><input data-risk-ref value="${esc(d.riskAssessmentRef||'')}" placeholder="Document number / revision"></div><div class="field"><label>Key controls applicable to this task *</label><textarea name="riskControls" placeholder="State the approved controls that the engineer must follow; do not just list hazards.">${esc(d.riskControls||'')}</textarea></div></div>
- <div data-risk-new class="${mode==='new'?'':'hidden'}"><p class="small">Record each significant hazard, the potential harm, people affected and the approved controls. A competent person must review the assessment before use.</p><div id="riskEditor">${riskDrafts.map(riskEntryEditor).join('')}</div><button type="button" class="btn secondary full" data-action="add-risk">＋ Add hazard and controls</button></div></div></div>`;
+ return `<div class="field"><label>Approved risk assessment reference (optional)</label><input name="riskAssessmentRef" value="${esc(d.riskAssessmentRef||'')}" placeholder="Document number or reference, if applicable"><div class="small">Use relevant approved site/OEM requirements for this task. The SOP does not replace its risk assessment.</div></div>`;
 }
 function updateRiskVisibility(){
  const f=$('#builderForm');if(!f)return;
@@ -156,13 +150,14 @@ function saveWorkingDraft(){
 function queueDraftSave(){clearTimeout(draftTimer);draftTimer=setTimeout(saveWorkingDraft,450)}
 function resumeWorkingDraft(){
  const draft=storedDraft();if(!draft){alert('No recoverable working draft was found.');return}
+ if(draft.draftFields?.templateType&&draft.draftFields.templateType!==TEMPLATES[0]){alert('This unfinished draft is from an older non-SOP template and cannot be revised in SOP-only mode. Your saved records are unchanged.');return}
  editingId=data.some(p=>p.id===draft.editingId)?draft.editingId:null;
  stepDrafts=jsoncopy(draft.stepDrafts);riskDrafts=jsoncopy(draft.riskDrafts);
  draftFields=jsoncopy(draft.draftFields);wizardStep=Math.min(4,Math.max(1,Number(draft.wizardStep)||1));
  builderDirty=true;page='builder';render();scrollWizardTop();
 }
 function nextDocumentNumber(templateType){
- const prefix=templateType===TEMPLATES[1]?'SWP':'SOP';
+ const prefix='SOP';
  const existingMax=Math.max(0,...data.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));
  let current=0;try{current=Number(localStorage.getItem(SEQUENCE_KEY))||0}catch{}
  return {number:'LG-'+prefix+'-'+String(Math.max(current,existingMax)+1).padStart(4,'0'),sequence:Math.max(current,existingMax)+1}
@@ -254,11 +249,11 @@ function leaveBuilder(){if(page!=='builder'||!builderDirty)return true;
 }
 function empty(t){return `<div class="empty">${esc(t)}</div>`}
 function itemCard(p){return `<div class="item"><div class="itemtop"><div><div class="itemtitle">${esc(p.title)}</div><div class="crumb">${crumb(p)}</div><div class="small">${esc(p.documentNumber||'Legacy reference')} · Rev ${revLabel(p.revision)}</div></div>${badge(p.status)}</div><div class="actions"><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open</button><button class="btn ghost" data-action="edit" data-id="${esc(p.id)}">Edit</button><button class="btn danger" data-action="delete" data-id="${esc(p.id)}" aria-label="Delete ${esc(p.title)}">Delete</button></div></div>`}
-function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">ENGINEERING PROCEDURE LIBRARY</div><h1>Clear procedures.<br>Consistent documents.</h1><p class="muted">Create and manage controlled SOPs and SWPs in one searchable library. You can also open a completed draft prepared for you.</p>${storedDraft()?'<div class="notice"><strong>Unfinished procedure saved on this device.</strong><div class="actions" style="margin-top:10px"><button class="btn green" data-action="resume-draft">Resume</button><button class="btn ghost" data-action="discard-draft">Discard</button></div></div>':''}<div class="actions"><button class="btn green" data-action="new">＋ Create procedure</button><button class="btn secondary" data-action="import-prepared">Import a prepared procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. You can import a prepared draft or create one yourself.')}</section><section class="panel"><h3>Focused engineering document control</h3><div class="pillrow"><span class="pill">SOP and SWP</span><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">PDF export</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">LineGuide v3.0 · Immutable photographs are stored once in IndexedDB and reused across revisions. Documents stay on this device only. Export a complete backup regularly.</p></section>`}
+function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">ENGINEERING PROCEDURE LIBRARY</div><h1>Clear procedures.<br>Consistent documents.</h1><p class="muted">Create clear, consistent SOPs with simple guided questions. Older saved documents remain available for reference. You can also open a completed draft prepared for you.</p>${storedDraft()?'<div class="notice"><strong>Unfinished procedure saved on this device.</strong><div class="actions" style="margin-top:10px"><button class="btn green" data-action="resume-draft">Resume</button><button class="btn ghost" data-action="discard-draft">Discard</button></div></div>':''}<div class="actions"><button class="btn green" data-action="new">＋ Create SOP</button><button class="btn secondary" data-action="import-prepared">Import a prepared procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. You can import a prepared draft or create one yourself.')}</section><section class="panel"><h3>Focused engineering document control</h3><div class="pillrow"><span class="pill">SOP and SWP</span><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">PDF export</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">LineGuide v3.0 · Immutable photographs are stored once in IndexedDB and reused across revisions. Documents stay on this device only. Export a complete backup regularly.</p></section>`}
 function searchableText(p){return [p.title,p.site,p.line,p.asset,p.taskType,p.purpose,p.notes,p.documentNumber,...(p.hazards||[]),...(p.steps||[]).flatMap(s=>[s.section,s.sourcePage,s.action,s.expected,s.verify]),...(p.riskEntries||[]).flatMap(r=>[r.hazard,r.harm,r.controls])].join(' ').toLowerCase()}
 function library(){let arr=filteredProcedures().sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));return `<section class="welcome"><div class="eyebrow">PROCEDURE LIBRARY</div><h1>Find a procedure</h1><p class="muted">Search by task, asset, line, site or keyword.</p></section><input class="search" id="searchInput" placeholder="⌕  e.g. belt, Packing Line 04, sensor" value="${esc(searchTerm)}"><div class="toolbar"><select id="statusFilter" class="search"><option value="all">All document states</option><option>Draft</option><option>In review</option><option>Approved</option></select><button class="btn green" data-action="new">＋ Create</button><button class="btn secondary" data-action="export">Export backup</button><button class="btn secondary" data-action="import">Import procedures</button></div><div id="libraryResults">${arr.map(itemCard).join('')||empty('No matching procedures. Try another search or create a procedure.')}</div>`}
 function browse(){let sites=[...new Set(data.map(p=>p.site).filter(Boolean))];return `<section class="welcome"><div class="eyebrow">ASSET HIERARCHY</div><h1>Browse by equipment</h1><p class="muted">Follow your site structure: site → line → asset → task.</p></section>${sites.map(site=>{let lines=[...new Set(data.filter(p=>p.site===site).map(p=>p.line))];return `<section class="panel"><h2>🏭 ${esc(site)}</h2>${lines.map(line=>{let assets=[...new Set(data.filter(p=>p.site===site&&p.line===line).map(p=>p.asset))];return `<div class="item"><h3>↳ ${esc(line||'Unassigned line')}</h3>${assets.map(asset=>`<div style="padding:8px 0 8px 12px;border-left:2px solid #dce3e8;margin:8px 0"><strong>⚙ ${esc(asset||'Unassigned asset')}</strong>${data.filter(p=>p.site===site&&p.line===line&&p.asset===asset).map(p=>`<div class="item" style="margin:8px 0 0"><div class="itemtitle">↳ ${esc(p.taskType||p.title)}</div><div class="crumb">${esc(p.title)}</div><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open procedure</button></div>`).join('')}</div>`).join('')}</div>`}).join('')}</section>`}).join('')||empty('Create a procedure to start your asset library.')}`}
-function startBuilder(p=null){builderDirty=false;riskDrafts=p?jsoncopy(p.riskEntries||[]):[];editingId=p?.id||null;stepDrafts=p?JSON.parse(JSON.stringify(p.steps||[])):[];draftFields=p?JSON.parse(JSON.stringify(p)): {title:'',site:'',line:'',asset:'',templateType:'Standard operating procedure (SOP)',taskType:'Operation / changeover',audience:'Maintenance engineers',purpose:'',prerequisites:'',tools:'',hazards:[],ppeItems:[],prerequisiteTypes:[],ppe:'',isolation:'',isolationMode:'',isolationReason:'',guards:'',finalChecks:'',notes:'',owner:'',reviewer:'',approver:'',status:'Draft',riskAssessmentMode:'existing',riskAssessmentRef:'',riskControls:'',riskEntries:[],changeNote:'Initial issue'};if(p&&p.status!=='Draft')draftFields.status='Draft';wizardStep=1;page='builder';render();scrollWizardTop()}
+function startBuilder(p=null){if(p&&p.templateType!==TEMPLATES[0]){alert('Older SWP records are kept for reference only. LineGuide now creates and revises SOPs only.');return}builderDirty=false;riskDrafts=p?jsoncopy(p.riskEntries||[]):[];editingId=p?.id||null;stepDrafts=p?JSON.parse(JSON.stringify(p.steps||[])):[];draftFields=p?JSON.parse(JSON.stringify(p)): {title:'',site:'',line:'',asset:'',templateType:'Standard operating procedure (SOP)',taskType:'Operation / changeover',audience:'Maintenance engineers',purpose:'',prerequisites:'',tools:'',hazards:[],ppeItems:[],prerequisiteTypes:[],ppe:'',isolation:'',isolationMode:'',isolationReason:'',guards:'',finalChecks:'',notes:'',owner:'',reviewer:'',approver:'',status:'Draft',riskAssessmentMode:'existing',riskAssessmentRef:'',riskControls:'',riskEntries:[],changeNote:'Initial issue'};if(p&&p.status!=='Draft')draftFields.status='Draft';wizardStep=1;page='builder';render();scrollWizardTop()}
 function stepEditor(s={},i){
  const expanded=!s.action?.trim()||i===stepDrafts.length-1;
  const sections=[...new Set(stepDrafts.map(x=>x.section).filter(x=>typeof x==='string'&&x.trim()))].slice(0,6);
@@ -276,9 +271,9 @@ function stepEditor(s={},i){
  <div class="field"><label>Reference document page (optional)</label><input data-step="sourcePage" value="${esc(s.sourcePage||'')}" placeholder="e.g. 3 or 4–5"></div>
  </details>`}
 
-function builder(){let p=editingId?data.find(x=>x.id===editingId):null,d=draftFields||{};return `<section class="welcome"><div class="eyebrow">${p?'EDIT PROCEDURE':'GUIDED AUTHORING'}</div><h1>${p?'Revise a procedure':'Create a procedure'}</h1><p class="muted">Choose from short, relevant lists. Use Other when the correct answer is not listed.</p><div class="pillrow"><span class="pill">Step ${wizardStep} of 4</span><span class="pill">Unfinished work is saved locally as you type</span></div></section><div class="panel"><div class="grid" style="margin-bottom:15px">${['Identify','Requirements','Instructions','Review'].map((x,i)=>`<div class="stat" style="padding:8px;border-color:${wizardStep===i+1?'#216b55':'#dce3e8'};background:${wizardStep===i+1?'#e8f2ee':'#f8fafb'}"><strong style="font-size:14px">${x}</strong><span>Stage ${i+1}</span></div>`).join('')}</div><form id="builderForm">
+function builder(){let p=editingId?data.find(x=>x.id===editingId):null,d=draftFields||{};return `<section class="welcome"><div class="eyebrow">${p?'EDIT PROCEDURE':'GUIDED AUTHORING'}</div><h1>${p?'Revise a procedure':'Create a procedure'}</h1><p class="muted">Choose from short, relevant lists. Use Other when the correct answer is not listed.</p><div class="pillrow"><span class="pill">Step ${wizardStep} of 4</span><span class="pill">Unfinished work is saved locally as you type</span></div></section><div class="panel"><div class="grid" style="margin-bottom:15px">${['Identify','Safety & preparation','Instructions','Review'].map((x,i)=>`<div class="stat" style="padding:8px;border-color:${wizardStep===i+1?'#216b55':'#dce3e8'};background:${wizardStep===i+1?'#e8f2ee':'#f8fafb'}"><strong style="font-size:14px">${x}</strong><span>Stage ${i+1}</span></div>`).join('')}</div><form id="builderForm">
 <div class="${wizardStep===1?'':'hidden'}" data-stage="1"><h2>1. Identify the procedure</h2>
-${basicSelect('templateType',TEMPLATES.includes(d.templateType)?d.templateType:TEMPLATES[0],TEMPLATES,'Document template',true)}${d.templateType&&LEGACY_TEMPLATES.includes(d.templateType)?'<div class="notice">This older document used a retired template. Select SOP or SWP to continue. The existing saved version remains unchanged until you save.</div>':''}
+<input type="hidden" name="templateType" value="${esc(TEMPLATES[0])}"><div class="pillrow"><span class="pill">Standard Operating Procedure (SOP)</span></div>
 <div class="field"><label>Procedure title *</label><input name="title" required value="${esc(d.title||'')}" placeholder="e.g. Replace conveyor belt"></div>
 ${choiceMarkup('site',d.site||'',existingValues('site'),'Site',true)}
 ${choiceMarkup('line',d.line||'',lineValues(d.site||''),'Production line',true,!!d.site)}
@@ -286,7 +281,7 @@ ${choiceMarkup('asset',d.asset||'',assetValues(d.site||'',d.line||''),'Asset / m
 ${choiceMarkup('taskType',d.taskType||'',curatedValues('taskType',TASK_TYPES,d.taskType),'Task type')}
 ${choiceMarkup('audience',d.audience||'',curatedValues('audience',AUDIENCES,d.audience),'Intended audience')}
 <div class="field"><label>Purpose / scope *</label><textarea name="purpose" required placeholder="Describe the scope and exclusions specific to this task.">${esc(d.purpose||'')}</textarea></div></div>
-<div class="${wizardStep===2?'':'hidden'}" data-stage="2"><h2>2. Requirements and safety</h2>
+<div class="${wizardStep===2?'':'hidden'}" data-stage="2"><h2>2. Safety and preparation</h2>
 ${multiChoice('prerequisiteTypes',PREREQ_CHOICES,d.prerequisiteTypes||[],'Prerequisite categories — select relevant items')}
 <div class="field"><label>Prerequisites and competence *</label><textarea name="prerequisites" required placeholder="State the actual training, authorisations, permit numbers and other requirements from approved sources.">${esc(d.prerequisites||'')}</textarea></div>
 <div class="field"><label>Tools, materials and parts</label><textarea name="tools" placeholder="Required tools, consumables, parts and specifications.">${esc(d.tools||'')}</textarea></div>
@@ -331,7 +326,6 @@ function captureForm(){
    }
    o[name]=chosen;
  }
- if(f.elements.templateType?.value===TEMPLATES[1])o.riskAssessmentRef=f.querySelector('[data-risk-ref]')?.value||'';
  o.riskEntries=jsoncopy(riskDrafts);
  o.steps=jsoncopy(stepDrafts);draftFields=o;
 }
@@ -364,16 +358,7 @@ function validateStage(n){
      el.focus();return false;
    }
  }
- if(n===2){
-  const swp=$('#builderForm [name=templateType]')?.value===TEMPLATES[1];
-  if(swp){const mode=stage.querySelector('[data-risk-mode]')?.value;
-   if(mode==='existing'&&!stage.querySelector('[data-risk-ref]').value.trim()){alert('Enter the approved risk assessment reference, or select the task-specific assessment option.');return false}
-   if(mode==='existing'&&!stage.querySelector('[name=riskControls]').value.trim()){alert('Summarise the key task-specific controls from the approved risk assessment.');return false}
-   if(mode==='new'){captureRiskEntries();if(!riskDrafts.length){alert('Add at least one hazard and its controls to the assessment.');return false}
-    for(let i=0;i<riskDrafts.length;i++){const r=riskDrafts[i];if(!r.hazard?.trim()||!r.harm?.trim()||!r.people?.trim()||!r.controls?.trim()){alert('Complete the hazard, possible harm, people affected and controls for assessment entry '+(i+1)+'.');return false}}
-   }
-  }
- }
+
  if(n===3){captureSteps();if(!stepDrafts.length){alert('Add at least one instruction step.');return false}
    for(let i=0;i<stepDrafts.length;i++)if(!stepDrafts[i].action?.trim()||!stepDrafts[i].expected?.trim()){alert(`Step ${i+1} needs an action and expected result.`);return false}
  }
@@ -383,19 +368,14 @@ function validateAllFields(fields){
  for(let k of ['title','site','line','asset','purpose','prerequisites','finalChecks','owner']){
    if(!String(fields[k]||'').trim()){alert('The procedure is missing a required field: '+k+'. Return to the relevant stage to complete it.');return false}
  }
- if(!TEMPLATES.includes(fields.templateType)){alert('Select SOP or SWP as the document template.');return false}
+ if(fields.templateType!==TEMPLATES[0]){alert('LineGuide now creates SOPs only. Older SWP documents remain read-only.');return false}
  if(!ISOLATION_MODES.includes(fields.isolationMode)){
    alert('Choose whether isolation is required, not required, or another approved safe-state approach.');return false
  }
  if(fields.isolationMode!=='not-required'&&!String(fields.isolation||'').trim()){
    alert('Add the approved isolation or safe-state reference for this task.');return false
  }
- if(fields.templateType===TEMPLATES[1]){
-  if(!['existing','new'].includes(fields.riskAssessmentMode)){alert('Choose a recognised risk assessment method: existing approved assessment or new task-specific assessment.');return false}
-  if(fields.riskAssessmentMode==='existing'&&!String(fields.riskAssessmentRef||'').trim()){alert('An SWP needs an approved risk assessment reference, or a new task-specific assessment.');return false}
-  if(fields.riskAssessmentMode==='existing'&&!String(fields.riskControls||'').trim()){alert('The SWP must include the applicable task-specific risk controls.');return false}
-  if(fields.riskAssessmentMode==='new'&&(!Array.isArray(fields.riskEntries)||!fields.riskEntries.length||fields.riskEntries.some(r=>!r.hazard?.trim()||!r.harm?.trim()||!r.people?.trim()||!r.controls?.trim()))){alert('Complete the task-specific risk assessment before saving.');return false}
- }
+
  if(!Array.isArray(fields.steps)||!fields.steps.length||fields.steps.some(s=>!s.action?.trim()||!s.expected?.trim())){alert('At least one complete instruction step is required.');return false}
  return true;
 }
@@ -574,7 +554,7 @@ function act(a,pid,idx){
  if(a==='discard-draft'){if(confirm('Discard the unfinished procedure? Your saved library is unaffected.')){discardWorkingDraft();nav('home')}return}
  if(a==='library'){if(leaveBuilder())nav('library');return}
  if(a==='open'){if(!leaveBuilder())return;currentId=pid;currentRevisionIndex=null;nav('detail');return}
- if(a==='edit'){if(!leaveBuilder())return;if(storedDraft()&&!confirm('Discard your unfinished procedure and edit this document?'))return;discardWorkingDraft();let p=data.find(x=>x.id===pid);if(p)startBuilder(p);return}
+ if(a==='edit'){const p=data.find(x=>x.id===pid);if(p&&p.templateType!==TEMPLATES[0]){alert('This older SWP is retained for reference and PDF export only. SOP creation is available from Home.');return}if(!leaveBuilder())return;if(storedDraft()&&!confirm('Discard your unfinished procedure and edit this document?'))return;discardWorkingDraft();if(p)startBuilder(p);return}
  if(a==='add-risk'){captureSteps();captureForm();riskDrafts.push({hazard:'',harm:'',people:'',controls:'',actions:''});builderDirty=true;render();queueDraftSave();return}
  if(a==='remove-risk'){captureSteps();captureForm();riskDrafts.splice(Number(idx),1);builderDirty=true;render();queueDraftSave();return}
  if(a==='add-step'){captureSteps();captureForm();stepDrafts.push({action:'',expected:'',verify:'',warning:'',photo:'',section:stepDrafts.at(-1)?.section||''});builderDirty=true;render();queueDraftSave();return}
