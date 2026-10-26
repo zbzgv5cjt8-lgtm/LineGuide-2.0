@@ -1,5 +1,5 @@
 /* Offline shell only; procedure data is stored separately in the browser. */
-const CACHE='lineguide-shell-v3-0-shared-photos';
+const CACHE='lineguide-shell-v3-1-sop-only';
 const CORE=['./','./index.html','./photo-store.js','./app.js','./pdf-export.js','./manifest.json'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));

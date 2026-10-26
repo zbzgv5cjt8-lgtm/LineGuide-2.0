@@ -49,7 +49,7 @@ def app(browser,server):
 def getdata(pg):return json.loads(pg.evaluate(f"localStorage.getItem('{KEY}')"))
 def prepare_one(pg,title='Example — startup',swp=False,site='QA Site',line='Line 1',asset='Machine 1'):
  pg.locator('[data-page=builder]').click()
- if swp:pg.locator('[name=templateType]').select_option(SWP)
+ if swp: raise ValueError('New SWP creation is intentionally disabled in SOP-only mode')
  pg.locator('[name=title]').fill(title)
  for k,val in [('site',site),('line',line),('asset',asset)]:
   dropdown=pg.locator('[data-choice='+k+']')
@@ -99,66 +99,31 @@ def test_sop_creation_minimal_and_readable_preview(app):
  assert not errors
 
 @pytest.mark.group1
-def test_swp_existing_ra_is_required(app):
- pg,_,errors,dialogs=app
+def test_sop_only_mode_has_no_swp_creator_or_risk_wizard(app):
+ pg,_,errors,_=app
  pg.locator('[data-page=builder]').click()
- pg.locator('[name=templateType]').select_option(SWP)
- pg.locator('[name=title]').fill('SWP existing RA')
- for k,v in [('site','Site A'),('line','Line A'),('asset','Asset A')]:
-  pg.locator('[data-choice='+k+']').select_option('__custom__');pg.locator('input[name='+k+']').fill(v)
- pg.locator('[name=purpose]').fill('Fictional test')
- pg.locator('#nextBtn').click()
- pg.locator('[name=prerequisites]').fill('Approved competence')
- pg.locator('[data-isolation-mode]').select_option('not-required')
- pg.locator('#nextBtn').click()
- assert pg.locator('[data-stage="2"]').is_visible()
- assert any('risk assessment reference' in x.lower() for x in dialogs)
- pg.locator('[data-risk-ref]').fill('RA-42 REV 3')
- pg.locator('[name=riskControls]').fill('Task-specific controls must be established by competent reviewer')
- pg.locator('#nextBtn').click()
- assert pg.locator('[data-stage="3"]').is_visible()
+ assert pg.locator('[name=templateType]').input_value()==SOP
+ assert pg.locator('[name=templateType]').get_attribute('type')=='hidden'
+ assert pg.locator('[data-swp-risk]').count()==0
+ assert pg.locator('[data-risk-mode]').count()==0
+ assert pg.locator('[data-action=add-risk]').count()==0
+ assert pg.get_by_text('Standard Operating Procedure (SOP)').count()>=1
  assert not errors
 
 @pytest.mark.group1
-def test_swp_new_ra_capture_and_print(app):
- pg,_,errors,dialogs=app
- pg.locator('[data-page=builder]').click()
- pg.locator('[name=templateType]').select_option(SWP)
- pg.locator('[name=title]').fill('SWP with new assessment')
- for k,v in [('site','Site C'),('line','Line C'),('asset','Asset C')]:
-  pg.locator('[data-choice='+k+']').select_option('__custom__');pg.locator('input[name='+k+']').fill(v)
- pg.locator('[name=purpose]').fill('Fictional scope')
+def test_sop_can_reference_an_ra_but_does_not_require_it(app):
+ pg,_,errors,_=app
+ result=prepare_one(pg,'Routine SOP with optional RA')
+ assert result['templateType']==SOP
+ assert result.get('riskAssessmentRef','')==''
+ pg.locator('[data-page=library]').click()
+ pg.locator('[data-action=edit]').click()
  pg.locator('#nextBtn').click()
- pg.locator('[name=prerequisites]').fill('Qualified trained personnel')
- pg.locator('[data-isolation-mode]').select_option('required');pg.locator('[name=isolation]').fill('Fictional approved safe-state ref')
- hz=pg.locator('[data-multi-wrap=hazards]');hz.locator('summary').click()
- hz.locator('input[name=hazards][value="Sharp edges / surfaces"]').check()
- pg.locator('[data-risk-mode]').select_option('new')
- pg.locator('#nextBtn').click()
- assert pg.locator('[data-stage="2"]').is_visible()
- pg.locator('[data-action=add-risk]').click()
- # Select custom hazard
- pg.locator('[data-choice=riskHazard0]').select_option('__custom__')
- pg.locator('input[name=riskHazard0]').fill('Sharp panel burrs')
- pg.locator('[data-risk=harm]').fill('Cut / laceration')
- pg.locator('[data-risk-people]').select_option('Maintenance engineers')
- pg.locator('[data-risk=controls]').fill('Handle using the approved protected technique; no unsupported PPE assumption')
- pg.locator('#nextBtn').click()
- assert pg.locator('[data-stage="3"]').is_visible()
- pg.locator('[data-action=add-step]').click()
- pg.locator('[data-step=action]').fill('Review approved protection method')
- pg.locator('[data-step=expected]').fill('Protection method confirmed')
- pg.locator('[name=finalChecks]').fill('Record inspection')
- pg.locator('#nextBtn').click()
- pg.locator('[data-choice=owner]').select_option('__custom__');pg.locator('input[name=owner]').fill('QA Author')
- pg.locator('#nextBtn').click()
- p=next(v for v in getdata(pg) if v['title']=='SWP with new assessment')
- assert p['riskAssessmentMode']=='new' and len(p['riskEntries'])==1
- assert p['riskEntries'][0]['people']=='Maintenance engineers'
- assert 'Sharp panel burrs' in pg.locator('.docpreview').inner_text()
- assert 'approved protected technique' in pg.locator('.docpreview').inner_text()
- pdf=pg.pdf(format='A4',print_background=True)
- assert pdf.startswith(b'%PDF') and len(pdf)>5000
+ pg.locator('[name=riskAssessmentRef]').fill('Fictional site assessment RA-001')
+ for _ in range(3):pg.locator('#nextBtn').click()
+ record=getdata(pg)[0]
+ assert record['riskAssessmentRef']=='Fictional site assessment RA-001'
+ assert 'Fictional site assessment RA-001' in pg.locator('.docpreview').inner_text()
  assert not errors
 
 @pytest.mark.group1
@@ -518,7 +483,7 @@ import fitz
 @pytest.mark.group1
 def test_pdf_button_exports_real_searchable_pdf_repeated(app):
     page, _, errors, _ = app
-    prepare_one(page,'Reliable offline PDF',swp=True)
+    prepare_one(page,'Reliable offline PDF')
     for attempt in range(2):
         with page.expect_download() as info:
             page.locator('[data-action=save-pdf]').click()
@@ -528,7 +493,7 @@ def test_pdf_button_exports_real_searchable_pdf_repeated(app):
         doc = fitz.open(download.path())
         assert len(doc)>=1
         text = '\n'.join(x.get_text() for x in doc)
-        for fragment in ['Reliable offline PDF','LG-SWP-0001','Purpose and scope','Working instructions','Document control','Fictional approved RA-TEST-01']:
+        for fragment in ['Reliable offline PDF','LG-SOP-0001','Purpose and scope','Working instructions','Document control']:
             assert fragment in text, (fragment, text)
         assert 'DRAFT / UNAPPROVED' in text
     assert not errors
@@ -820,14 +785,32 @@ def test_invalid_photo_import_rejected_instead_of_silently_discarded(app):
  assert not errors
 
 @pytest.mark.group5
-def test_swp_approval_validation_rejects_unrecognised_risk_method(app):
+def test_imported_legacy_swp_is_read_only_and_not_converted(app):
  pg,_,errors,dialogs=app
- p=prepare_one(pg,'Risk method must be recognised',swp=True)
- accepted=pg.evaluate('(p)=>validateAllFields({...p,riskAssessmentMode:"unknown-mode"})',p)
- assert accepted is False
- assert any('risk assessment method' in msg.lower() for msg in dialogs)
+ from datetime import datetime,timezone
+ now=datetime.now(timezone.utc).isoformat()
+ doc={'id':'legacy-swp-record','title':'Historical safe working procedure',
+ 'templateType':SWP,'site':'Fictional site','line':'Test line','asset':'Equipment',
+ 'purpose':'Historical reference only','status':'Draft','owner':'Old author',
+ 'prerequisites':'Test conditions','revision':'1.0','created':now,'updated':now,
+ 'isolationMode':'not-required','riskAssessmentMode':'existing',
+ 'riskAssessmentRef':'RA-OLD-001','riskControls':'Legacy example controls',
+ 'finalChecks':'Completed','steps':[{'action':'Historical action','expected':'Recorded result'}]}
+ with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
+ chooser.value.set_files({'name':'old-swp.json','mimeType':'application/json',
+ 'buffer':json.dumps({'app':'LineGuide','version':1,'procedures':[doc]}).encode()})
+ pg.locator('.docpreview').wait_for()
+ assert 'RA-OLD-001' in pg.locator('.docpreview').inner_text()
+ pg.locator('[data-action=open]').click()
+ assert pg.locator('[data-action=edit]').count()==0
+ pg.evaluate('() => act("edit","legacy-swp-record")')
+ assert pg.locator('.docpreview').count()==0
+ assert pg.locator('[data-stage]').count()==0
+ assert any('older SWP' in msg for msg in dialogs)
+ assert getdata(pg)[0]['templateType']==SWP
+ pg.locator('[data-page=builder]').click()
+ assert pg.locator('[name=templateType]').input_value()==SOP
  assert not errors
-
 
 # v3 shared-photo architecture. All images are synthetic; no company material.
 @pytest.mark.group5
