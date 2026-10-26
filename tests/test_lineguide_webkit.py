@@ -10,12 +10,13 @@ from pathlib import Path
 import fitz
 from PIL import Image
 from playwright.sync_api import sync_playwright
+from test_lineguide_e2e import server
 
 ROOT=Path(__file__).resolve().parent.parent
 KEY='lineguide-procedures-v1'
 
 
-def test_webkit_import_photo_preview_and_pdf():
+def test_webkit_import_photo_preview_and_pdf(server):
     image=Image.new('RGB',(80,60),'#4a8758')
     buffer=BytesIO()
     image.save(buffer,'JPEG')
@@ -37,6 +38,8 @@ def test_webkit_import_photo_preview_and_pdf():
         pg.on('pageerror',lambda err:errors.append(str(err)))
         pg.on('dialog',lambda dialog:dialog.accept())
         html=(ROOT/'index.html').read_text().replace('<script src="app.js"></script>','')
+        pg.goto(server+'tests/blank.html')
+        html=html.replace('<script src="photo-store.js"></script>','').replace('<script src="pdf-export.js"></script>','')
         pg.set_content(html)
         pg.evaluate("""() => {
             const storage={};
@@ -49,6 +52,7 @@ def test_webkit_import_photo_preview_and_pdf():
                 }
             })
         }""")
+        pg.add_script_tag(content=(ROOT/'photo-store.js').read_text())
         pg.add_script_tag(content=(ROOT/'app.js').read_text())
         pg.add_script_tag(content=(ROOT/'pdf-export.js').read_text())
         with pg.expect_file_chooser() as picker:
@@ -58,7 +62,7 @@ def test_webkit_import_photo_preview_and_pdf():
         pg.locator('.docphoto').wait_for()
         assert pg.locator('.docphoto').evaluate('img=>img.complete&&img.naturalWidth>0')
         assert pg.locator('.docphoto').count()==1
-        assert len(json.loads(pg.evaluate('localStorage.getItem("'+KEY+'")'))[0]['steps'][0]['photo'])>100
+        assert json.loads(pg.evaluate('localStorage.getItem("'+KEY+'")'))[0]['steps'][0]['photo'].startswith('idb:sha256:')
         with pg.expect_download() as info:
             pg.locator('[data-action=save-pdf]').click()
         pdf=fitz.open(info.value.path())

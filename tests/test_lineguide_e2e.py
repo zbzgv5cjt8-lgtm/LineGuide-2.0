@@ -28,15 +28,19 @@ def browser():
   b.close()
 
 @pytest.fixture
-def app(browser):
+def app(browser,server):
  ctx=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,accept_downloads=True)
- page=ctx.new_page();page.set_default_timeout(6000)
+ page=ctx.new_page();page.set_default_timeout(10000)
+ page.goto(server+'tests/blank.html')
  errors=[];dialogs=[]
  page.on('pageerror',lambda e: errors.append(str(e)))
  page.on('dialog',lambda d: (dialogs.append(d.message),d.accept()))
- html=(ROOT/'index.html').read_text().replace('<script src="app.js"></script>','')
+ html=(ROOT/'index.html').read_text()
+ for tag in ['<script src="photo-store.js"></script>','<script src="app.js"></script>','<script src="pdf-export.js"></script>']:
+  html=html.replace(tag,'')
  page.set_content(html)
  page.evaluate("""() => {const store={};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>delete store[k]}})}""")
+ page.add_script_tag(content=(ROOT/'photo-store.js').read_text())
  page.add_script_tag(content=(ROOT/'app.js').read_text())
  page.add_script_tag(content=(ROOT/'pdf-export.js').read_text())
  yield page,ctx,errors,dialogs
@@ -234,7 +238,7 @@ def test_export_and_backups(app):
  pg.locator('[data-page=library]').click()
  with pg.expect_download() as download: pg.locator('[data-action=export]').click()
  backup=json.loads(download.value.path().read_text())
- assert backup['app']=='LineGuide' and len(backup['procedures'])==1
+ assert backup['app']=='LineGuide' and backup['version']==2 and len(backup['procedures'])==1
  assert not errors
 
 @pytest.mark.group2
@@ -276,8 +280,12 @@ def test_unsaved_builder_recovered_on_new_session(app):
  assert 'Interrupt recovery test' in stored
  # Simulate reopening the application in a fresh JS context with saved browser storage.
  second=ctx.new_page()
- second.set_content((ROOT/'index.html').read_text().replace('<script src="app.js"></script>',''))
+ second.goto(pg.url)
+ html=(ROOT/'index.html').read_text()
+ for tag in ['<script src="photo-store.js"></script>','<script src="app.js"></script>','<script src="pdf-export.js"></script>']:html=html.replace(tag,'')
+ second.set_content(html)
  second.evaluate('''storage=>{const store={'lineguide-wizard-draft-v1':storage};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setItem:(k,v)=>store[k]=String(v),removeItem:k=>delete store[k]}})}''',stored)
+ second.add_script_tag(content=(ROOT/'photo-store.js').read_text())
  second.add_script_tag(content=(ROOT/'app.js').read_text())
  assert second.locator('[data-action=resume-draft]').is_visible()
  second.locator('[data-action=resume-draft]').click()
@@ -327,7 +335,8 @@ def test_custom_options_and_photo_print(app):
  assert pg.locator('.docpreview img.docphoto').count()==1
  p=next(x for x in getdata(pg) if x['title']=='Photo and custom option test')
  assert p['taskType']=='Custom verification'
- assert p['steps'][0]['photo'].startswith('data:image/jpeg;base64,')
+ assert p['steps'][0]['photo'].startswith('idb:sha256:')
+ assert pg.locator('.docpreview img.docphoto').evaluate('img=>img.complete&&img.naturalWidth>0')
  assert len(pg.pdf(format='A4',print_background=True))>6000
  assert not errors
 
@@ -462,11 +471,15 @@ def test_import_malformed_json_keeps_records(app):
  assert not errors
 
 @pytest.mark.group4
-def test_damaged_local_data_is_not_overwritten(browser):
+def test_damaged_local_data_is_not_overwritten(browser,server):
  ctx=browser.new_context(viewport={'width':390,'height':844});pg=ctx.new_page()
- pg.set_content((ROOT/'index.html').read_text().replace('<script src="app.js"></script>',''))
+ pg.goto(server+'tests/blank.html')
+ html=(ROOT/'index.html').read_text()
+ for tag in ['<script src="photo-store.js"></script>','<script src="app.js"></script>','<script src="pdf-export.js"></script>']:html=html.replace(tag,'')
+ pg.set_content(html)
  pg.evaluate("""()=>{const m={'lineguide-procedures-v1':'{BROKEN'};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>m[k]??null,setItem:(k,v)=>m[k]=String(v),removeItem:k=>delete m[k]}})}""")
  errors=[];pg.on('pageerror',lambda e:errors.append(str(e)))
+ pg.add_script_tag(content=(ROOT/'photo-store.js').read_text())
  pg.add_script_tag(content=(ROOT/'app.js').read_text())
  assert pg.get_by_text('Stored data needs attention').count()==1
  assert pg.evaluate("localStorage.getItem('lineguide-procedures-v1')")=="{BROKEN"
@@ -494,7 +507,9 @@ def test_large_camera_photo_is_accepted_after_compression(app):
  pg.locator('[data-step=photoFile]').set_input_files({'name':'large_camera.png','mimeType':'image/png','buffer':buf.getvalue()})
  pg.locator('.stepbox img.photo').wait_for(timeout=15000)
  photo=pg.locator('[data-step=photo]').input_value()
- assert photo.startswith('data:image/jpeg;base64,') and len(photo)<950000
+ assert photo.startswith('idb:sha256:') and len(photo)==75
+ stored=pg.evaluate('(ref)=>window.LineGuidePhotos.get(ref)',photo)
+ assert stored.startswith('data:image/jpeg;base64,') and len(stored)<950000
  assert not errors
 
 
@@ -774,7 +789,7 @@ def test_prepared_photo_import_remains_visible_in_pdf_and_revision(app):
  assert pg.locator('.docphoto').count()==2
  assert pg.locator('.docphoto').evaluate_all('els=>els.every(e=>e.complete&&e.naturalWidth>0)')
  assert len([s for s in getdata(pg)[0]['steps'] if s.get('photo')])==2
- assert any('2 embedded photographs' in msg for msg in dialogs)
+ assert any('2 attached photographs' in msg for msg in dialogs)
  with pg.expect_download() as info:pg.locator('[data-action=save-pdf]').click()
  pdf=fitz.open(info.value.path())
  assert sum(len(pdf.get_page_images(i)) for i in range(len(pdf)))==2
@@ -811,4 +826,106 @@ def test_swp_approval_validation_rejects_unrecognised_risk_method(app):
  accepted=pg.evaluate('(p)=>validateAllFields({...p,riskAssessmentMode:"unknown-mode"})',p)
  assert accepted is False
  assert any('risk assessment method' in msg.lower() for msg in dialogs)
+ assert not errors
+
+
+# v3 shared-photo architecture. All images are synthetic; no company material.
+@pytest.mark.group5
+def test_legacy_image_migration_deduplicates_revisions_and_preserves_pdf(app):
+ import base64
+ from io import BytesIO
+ from PIL import Image
+ import fitz
+ pg,_,errors,_=app
+ image=Image.new('RGB',(180,110),'#3d6f92')
+ buf=BytesIO();image.save(buf,format='JPEG')
+ photo='data:image/jpeg;base64,'+base64.b64encode(buf.getvalue()).decode()
+ doc={'id':'migrated-legacy','title':'Legacy archive with repeated photo',
+      'templateType':SOP,'site':'Site','line':'Test line','asset':'Demo',
+      'purpose':'Migration regression','prerequisites':'QA only',
+      'owner':'Test author','finalChecks':'Test only','status':'Draft',
+      'revision':'1.2','isolationMode':'not-required',
+      'steps':[{'action':'Inspect synthetic JPEG','expected':'Picture present','photo':photo}],
+      'revisionHistory':[
+        {'id':'migrated-legacy','title':'Old 1.1','status':'Draft','revision':'1.1','steps':[{'action':'Inspect older JPEG','expected':'Present','photo':photo}]},
+        {'id':'migrated-legacy','title':'Old 1.0','status':'Draft','revision':'1.0','steps':[{'action':'Inspect original JPEG','expected':'Present','photo':photo}]}
+      ]}
+ pg.evaluate("""doc=>{localStorage.setItem('lineguide-procedures-v1',JSON.stringify([doc]));}""",doc)
+ pg.evaluate("initialisePhotoStorage()")
+ pg.wait_for_function("""() => JSON.parse(localStorage.getItem('lineguide-procedures-v1'))[0].steps[0].photo.startsWith('idb:sha256:')""")
+ result=getdata(pg)[0]
+ ref=result['steps'][0]['photo']
+ assert all(rev['steps'][0]['photo']==ref for rev in result['revisionHistory'])
+ count=pg.evaluate("""async()=>{const db=await LineGuidePhotos.open();return new Promise((resolve,reject)=>{const r=db.transaction('images','readonly').objectStore('images').count();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}""")
+ assert count==1
+ pg.locator('[data-page=library]').click()
+ pg.locator('[data-action=open]').click()
+ pg.locator('[data-action=preview]').click()
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => [...document.querySelectorAll('.docphoto')].every(img=>img.complete&&img.naturalWidth>0)")
+ with pg.expect_download() as file: pg.locator('[data-action=save-pdf]').click()
+ assert sum(len(p.get_images()) for p in fitz.open(file.value.path()))==1
+ pg.locator('[data-action=open]').click()
+ pg.locator('[data-action=view-revision]').first.click()
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => [...document.querySelectorAll('.docphoto')].every(img=>img.complete&&img.naturalWidth>0)")
+ assert pg.locator('.docpreview').is_visible()
+ assert not errors
+
+@pytest.mark.group5
+def test_portable_backup_has_only_one_photo_for_multiple_revisions(app):
+ import base64
+ from io import BytesIO
+ from PIL import Image
+ pg,_,errors,_=app
+ buf=BytesIO();Image.new('RGB',(96,96),'#225599').save(buf,format='JPEG')
+ photo='data:image/jpeg;base64,'+base64.b64encode(buf.getvalue()).decode()
+ doc={'id':'two-revisions','title':'Backup dedup example','site':'Site','line':'Line','asset':'Any',
+ 'templateType':SOP,'purpose':'Testing backups','prerequisites':'QA','owner':'Test author',
+ 'finalChecks':'Test pass','status':'Draft','revision':'1.1','isolationMode':'not-required',
+ 'steps':[{'action':'Current step','expected':'Present','photo':photo}],
+ 'revisionHistory':[{'id':'two-revisions','title':'Old','revision':'1.0','steps':[{'action':'Historical step','expected':'Present','photo':photo}]}]}
+ with pg.expect_file_chooser() as choose: pg.locator('[data-action=import-prepared]').click()
+ choose.value.set_files({'name':'legacy.json','mimeType':'application/json','buffer':json.dumps({'app':'LineGuide','version':1,'procedures':[doc]}).encode()})
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => document.querySelector('.docphoto')?.naturalWidth>0")
+ with pg.expect_download() as export:
+  pg.evaluate('exportData()')
+ backup=json.loads(export.value.path().read_text())
+ assert backup['version']==2
+ assert len(backup['images'])==1
+ ref=backup['procedures'][0]['steps'][0]['photo']
+ assert ref in backup['images']
+ assert ref==backup['procedures'][0]['revisionHistory'][0]['steps'][0]['photo']
+ assert backup['images'][ref].startswith('data:image/jpeg;base64,')
+ assert len(json.dumps(backup))<len(json.dumps({'procedures':[doc]}))
+ # Simulate a fresh device by clearing both metadata and original IndexedDB images.
+ pg.evaluate("""async () => {
+   const db=await LineGuidePhotos.open();
+   await new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+   localStorage.setItem('lineguide-procedures-v1','[]');
+   data=[];
+   nav('home');
+ }""")
+ with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
+ chooser.value.set_files({'name':'portable-v2.json','mimeType':'application/json','buffer':json.dumps(backup).encode()})
+ pg.locator('.docphoto').wait_for()
+ pg.wait_for_function("() => document.querySelector('.docphoto')?.naturalWidth>0")
+ assert len(getdata(pg))==1
+ assert not errors
+
+@pytest.mark.group5
+def test_incomplete_version2_image_manifest_rejected_without_overwriting(app):
+ pg,_,errors,dialogs=app
+ before=getdata(pg)
+ ref='idb:sha256:'+'0'*64
+ doc={'id':'bad-v2','title':'Incomplete backup','steps':[{'action':'Test','expected':'Test','photo':ref}]}
+ with pg.expect_file_chooser() as choose:pg.locator('[data-action=import-prepared]').click()
+ choose.value.set_files({'name':'missing-photos.json','mimeType':'application/json',
+                         'buffer':json.dumps({'app':'LineGuide','version':2,'procedures':[doc],'images':{}}).encode()})
+ for _ in range(50):
+  if any('missing a photograph' in msg for msg in dialogs): break
+  pg.wait_for_timeout(100)
+ assert getdata(pg)==before
+ assert any('missing a photograph' in msg for msg in dialogs)
  assert not errors

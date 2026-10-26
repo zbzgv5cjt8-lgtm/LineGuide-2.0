@@ -206,7 +206,7 @@ function compressProcedurePhoto(file){
  });
 }
 function normaliseRisk(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid risk entry');let r={};for(const k of ['hazard','harm','people','controls','actions'])r[k]=typeof v[k]==='string'?v[k].slice(0,10000):'';return r}
-function normaliseStep(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid instruction step');let r={};for(let k of ['action','expected','verify','warning','type','verifyMethod','section','sourcePage','photoCaption'])r[k]=typeof v[k]==='string'?v[k].slice(0,30000):'';if(v.photo!==undefined&&v.photo!==null&&v.photo!==''){if(!photoDataValid(v.photo))throw Error('An embedded procedure photograph is invalid or damaged. No photographs have been discarded; correct the source file and import again.');r.photo=v.photo}else r.photo='';return r}
+function normaliseStep(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid instruction step');let r={};for(let k of ['action','expected','verify','warning','type','verifyMethod','section','sourcePage','photoCaption'])r[k]=typeof v[k]==='string'?v[k].slice(0,30000):'';if(v.photo!==undefined&&v.photo!==null&&v.photo!==''){if(!photoDataValid(v.photo)&&!window.LineGuidePhotos?.isRef(v.photo))throw Error('An embedded procedure photograph is invalid or damaged. No photographs have been discarded; correct the source file and import again.');r.photo=v.photo}else r.photo='';return r}
 function normaliseProcedure(v,depth=0){
   if(!v||typeof v!=='object'||Array.isArray(v)||typeof v.id!=='string'||!v.id.trim()||v.id.length>150||typeof v.title!=='string'||!v.title.trim())throw Error('Invalid procedure');
   if(!Array.isArray(v.steps)||v.steps.length>300)throw Error('Invalid steps');
@@ -254,7 +254,7 @@ function leaveBuilder(){if(page!=='builder'||!builderDirty)return true;
 }
 function empty(t){return `<div class="empty">${esc(t)}</div>`}
 function itemCard(p){return `<div class="item"><div class="itemtop"><div><div class="itemtitle">${esc(p.title)}</div><div class="crumb">${crumb(p)}</div><div class="small">${esc(p.documentNumber||'Legacy reference')} · Rev ${revLabel(p.revision)}</div></div>${badge(p.status)}</div><div class="actions"><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open</button><button class="btn ghost" data-action="edit" data-id="${esc(p.id)}">Edit</button><button class="btn danger" data-action="delete" data-id="${esc(p.id)}" aria-label="Delete ${esc(p.title)}">Delete</button></div></div>`}
-function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">ENGINEERING PROCEDURE LIBRARY</div><h1>Clear procedures.<br>Consistent documents.</h1><p class="muted">Create and manage controlled SOPs and SWPs in one searchable library. You can also open a completed draft prepared for you.</p>${storedDraft()?'<div class="notice"><strong>Unfinished procedure saved on this device.</strong><div class="actions" style="margin-top:10px"><button class="btn green" data-action="resume-draft">Resume</button><button class="btn ghost" data-action="discard-draft">Discard</button></div></div>':''}<div class="actions"><button class="btn green" data-action="new">＋ Create procedure</button><button class="btn secondary" data-action="import-prepared">Import a prepared procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. You can import a prepared draft or create one yourself.')}</section><section class="panel"><h3>Focused engineering document control</h3><div class="pillrow"><span class="pill">SOP and SWP</span><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">PDF export</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">LineGuide v2.9 · Procedures are stored privately in this browser only; they do not sync across devices. Back up your library regularly.</p></section>`}
+function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">ENGINEERING PROCEDURE LIBRARY</div><h1>Clear procedures.<br>Consistent documents.</h1><p class="muted">Create and manage controlled SOPs and SWPs in one searchable library. You can also open a completed draft prepared for you.</p>${storedDraft()?'<div class="notice"><strong>Unfinished procedure saved on this device.</strong><div class="actions" style="margin-top:10px"><button class="btn green" data-action="resume-draft">Resume</button><button class="btn ghost" data-action="discard-draft">Discard</button></div></div>':''}<div class="actions"><button class="btn green" data-action="new">＋ Create procedure</button><button class="btn secondary" data-action="import-prepared">Import a prepared procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. You can import a prepared draft or create one yourself.')}</section><section class="panel"><h3>Focused engineering document control</h3><div class="pillrow"><span class="pill">SOP and SWP</span><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">PDF export</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">LineGuide v3.0 · Immutable photographs are stored once in IndexedDB and reused across revisions. Documents stay on this device only. Export a complete backup regularly.</p></section>`}
 function searchableText(p){return [p.title,p.site,p.line,p.asset,p.taskType,p.purpose,p.notes,p.documentNumber,...(p.hazards||[]),...(p.steps||[]).flatMap(s=>[s.section,s.sourcePage,s.action,s.expected,s.verify]),...(p.riskEntries||[]).flatMap(r=>[r.hazard,r.harm,r.controls])].join(' ').toLowerCase()}
 function library(){let arr=filteredProcedures().sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));return `<section class="welcome"><div class="eyebrow">PROCEDURE LIBRARY</div><h1>Find a procedure</h1><p class="muted">Search by task, asset, line, site or keyword.</p></section><input class="search" id="searchInput" placeholder="⌕  e.g. belt, Packing Line 04, sensor" value="${esc(searchTerm)}"><div class="toolbar"><select id="statusFilter" class="search"><option value="all">All document states</option><option>Draft</option><option>In review</option><option>Approved</option></select><button class="btn green" data-action="new">＋ Create</button><button class="btn secondary" data-action="export">Export backup</button><button class="btn secondary" data-action="import">Import procedures</button></div><div id="libraryResults">${arr.map(itemCard).join('')||empty('No matching procedures. Try another search or create a procedure.')}</div>`}
 function browse(){let sites=[...new Set(data.map(p=>p.site).filter(Boolean))];return `<section class="welcome"><div class="eyebrow">ASSET HIERARCHY</div><h1>Browse by equipment</h1><p class="muted">Follow your site structure: site → line → asset → task.</p></section>${sites.map(site=>{let lines=[...new Set(data.filter(p=>p.site===site).map(p=>p.line))];return `<section class="panel"><h2>🏭 ${esc(site)}</h2>${lines.map(line=>{let assets=[...new Set(data.filter(p=>p.site===site&&p.line===line).map(p=>p.asset))];return `<div class="item"><h3>↳ ${esc(line||'Unassigned line')}</h3>${assets.map(asset=>`<div style="padding:8px 0 8px 12px;border-left:2px solid #dce3e8;margin:8px 0"><strong>⚙ ${esc(asset||'Unassigned asset')}</strong>${data.filter(p=>p.site===site&&p.line===line&&p.asset===asset).map(p=>`<div class="item" style="margin:8px 0 0"><div class="itemtitle">↳ ${esc(p.taskType||p.title)}</div><div class="crumb">${esc(p.title)}</div><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open procedure</button></div>`).join('')}</div>`).join('')}</div>`}).join('')}</section>`}).join('')||empty('Create a procedure to start your asset library.')}`}
@@ -272,7 +272,7 @@ function stepEditor(s={},i){
  ${stepChoice('verifyMethod',s.verifyMethod||'',VERIFY_METHODS,'Verification approach')}
  <div class="field"><label>Verification details</label><textarea data-step="verify" placeholder="How is the expected result checked? Use approved criteria.">${esc(s.verify||'')}</textarea></div>
  <div class="field"><label>Warning / caution (if relevant)</label><textarea data-step="warning" placeholder="Task-specific warning from approved sources…">${esc(s.warning||'')}</textarea></div>
- <div class="field"><label>Photo / visual reference (optional)</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" src="${photosafe(s.photo)?esc(s.photo):''}" alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="field"><label>Photo caption</label><input data-step="photoCaption" value="${esc(s.photoCaption||'')}" placeholder="Identify the control or screen shown"></div></div>
+ <div class="field"><label>Photo / visual reference (optional)</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" ${window.LineGuidePhotos.isRef(s.photo)?`data-photo-ref="${esc(s.photo)}"`:`src="${photosafe(s.photo)?esc(s.photo):''}"`} alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="field"><label>Photo caption</label><input data-step="photoCaption" value="${esc(s.photoCaption||'')}" placeholder="Identify the control or screen shown"></div></div>
  <div class="field"><label>Reference document page (optional)</label><input data-step="sourcePage" value="${esc(s.sourcePage||'')}" placeholder="e.g. 3 or 4–5"></div>
  </details>`}
 
@@ -477,10 +477,10 @@ function wireBuilder(){
      const file=fi.files?.[0];if(!file)return;
      if(!file.type.startsWith('image/')||file.size>18*1024*1024){alert('Choose an image under 18 MB. The app will resize it to save storage space.');fi.value='';return}
      captureSteps();captureForm();const index=Number(box.dataset.stepIndex);
-     compressProcedurePhoto(file).then(photo=>{
+     compressProcedurePhoto(file).then(photo=>window.LineGuidePhotos.put(photo)).then(ref=>{
        if(!stepDrafts[index])return;
-       stepDrafts[index].photo=photo;builderDirty=true;render();queueDraftSave();
-     }).catch(err=>alert(err.message||'Unable to process photo.'));
+       stepDrafts[index].photo=ref;builderDirty=true;render();queueDraftSave();
+     }).catch(err=>alert('Photograph was not added: '+(err.message||'Unable to store image.')+'. Existing photos are unchanged.'));
    };
  });
 }
@@ -507,7 +507,7 @@ function preview(){
    p.isolationMode==='other'?`<div class="docnotice"><strong>Other approved safe-state arrangement</strong><p>${esc(p.isolation||'Reference not specified')}</p></div>`:
    `<div class="warning">Isolation / safe-state classification not recorded (older document). Confirm before use.</div>`;
  const attachedPhotos=(p.steps||[]).filter(step=>!!step.photo).length;
- const steps=(p.steps||[]).map((st,i,all)=>`${st.section&&(!i||st.section!==all[i-1].section)?`<h3 class="docactivity">${esc(st.section)}</h3>`:''}<section class="docstep"><div class="docstepheader"><span class="docstepnumber">${String(i+1).padStart(2,'0')}</span><div><span class="docstepcaption">STEP ${i+1}${st.type?' · '+esc(st.type):''}</span><div class="docstepaction">${esc(st.action||'Instruction missing')}</div></div></div>${st.photo&&photoDataValid(st.photo)?`<img src="${esc(st.photo)}" alt="Equipment reference for step ${i+1}" class="docphoto">${st.photoCaption?`<p class="docphotocaption">${esc(st.photoCaption)}</p>`:''}`:st.photo?`<div class="docwarning">The photograph for step ${i+1} is damaged or unavailable. Please replace it before approval.</div>`:''}${st.sourcePage?`<p class="docsource">Source document page ${esc(st.sourcePage)}</p>`:''}${paragraph('Expected result',st.expected)}${paragraph('Verification',st.verify)}${st.verifyMethod&&st.verifyMethod!=='Visual check'?paragraph('Method',st.verifyMethod):''}${st.warning?`<div class="docwarning"><strong>Caution:</strong> ${esc(st.warning)}</div>`:''}</section>`).join('');
+ const steps=(p.steps||[]).map((st,i,all)=>`${st.section&&(!i||st.section!==all[i-1].section)?`<h3 class="docactivity">${esc(st.section)}</h3>`:''}<section class="docstep"><div class="docstepheader"><span class="docstepnumber">${String(i+1).padStart(2,'0')}</span><div><span class="docstepcaption">STEP ${i+1}${st.type?' · '+esc(st.type):''}</span><div class="docstepaction">${esc(st.action||'Instruction missing')}</div></div></div>${st.photo&&(photoDataValid(st.photo)||window.LineGuidePhotos.isRef(st.photo))?`<img ${window.LineGuidePhotos.isRef(st.photo)?`data-photo-ref="${esc(st.photo)}"`:`src="${esc(st.photo)}"`} alt="Equipment reference for step ${i+1}" class="docphoto">${st.photoCaption?`<p class="docphotocaption">${esc(st.photoCaption)}</p>`:''}`:st.photo?`<div class="docwarning">The photograph for step ${i+1} is damaged or unavailable. Please replace it before approval.</div>`:''}${st.sourcePage?`<p class="docsource">Source document page ${esc(st.sourcePage)}</p>`:''}${paragraph('Expected result',st.expected)}${paragraph('Verification',st.verify)}${st.verifyMethod&&st.verifyMethod!=='Visual check'?paragraph('Method',st.verifyMethod):''}${st.warning?`<div class="docwarning"><strong>Caution:</strong> ${esc(st.warning)}</div>`:''}</section>`).join('');
  return `${archived?'<div class="warning"><strong>ARCHIVED REVISION — FOR REFERENCE ONLY.</strong> Not the current controlled document.</div>':''}<div class="toolbar no-print"><button class="btn secondary" data-action="open" data-id="${esc(base.id)}">← Document details</button><button class="btn green" data-action="save-pdf">Save / Share PDF</button><span class="small" aria-label="Embedded photograph count">${attachedPhotos} ${attachedPhotos===1?'photograph':'photographs'} attached</span>${runningAsApp?'':'<button class="btn secondary" data-action="print-browser">Print in Safari</button>'}</div>
  <article class="panel preview docpreview"><div class="docmasthead"><div><div class="docbrand">LINEGUIDE</div><div class="docsubbrand">ENGINEERING PROCEDURES</div></div><div class="doctypelabel">${esc(docType)} · ${archived?'ARCHIVED':esc(p.status||'Draft')}</div></div>
  <h1>${esc(p.title)}</h1><div class="docmetagrid"><div><small>DOCUMENT</small><strong>${esc(documentNumber)}</strong></div><div><small>REVISION</small><strong>${revLabel(p.revision)}</strong></div><div><small>SITE</small><strong>${esc(p.site||'—')}</strong></div><div><small>LINE / ASSET</small><strong>${esc([p.line,p.asset].filter(Boolean).join(' · ')||'—')}</strong></div></div>
@@ -521,26 +521,50 @@ function preview(){
  <section class="docsection doccontrol"><h2>Document control</h2><div class="doccontrolgrid">${[['Author',p.owner],['Reviewer',p.reviewer],['Approver',p.approver],['Revision',revLabel(p.revision)],['Last updated',safeDate(p.updated)],['Change summary',p.changeNote]].filter(([,v])=>nonempty(v)).map(([k,v])=>`<div><small>${esc(k)}</small><strong>${esc(v)}</strong></div>`).join('')}</div>${p.status==='Approved'?`<p class="small">Approval recorded: ${esc(p.approvedBy||p.approver||'Not recorded')}${p.approvedAt?' · '+safeDate(p.approvedAt):''}. Prototype names are not authenticated signatures.</p>`:''}</section>
  <div class="docend">LineGuide · ${esc(documentNumber)} · Rev ${revLabel(p.revision)} · ${esc(p.status||'Draft')}</div></article>`;
 }
-function exportData(){
- const blob=new Blob([JSON.stringify({app:'LineGuide',version:1,exported:new Date().toISOString(),documentSequence:Number(localStorage.getItem(SEQUENCE_KEY))||0,procedures:data},null,2)],{type:'application/json'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);
- a.download='lineguide-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+async function exportData(){
+ try{
+  const pack=await window.LineGuidePhotos.backup(data);
+  const payload={app:'LineGuide',version:2,exported:new Date().toISOString(),
+    documentSequence:Number(localStorage.getItem(SEQUENCE_KEY))||0,
+    procedures:pack.procedures,images:pack.images};
+  const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='lineguide-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+ }catch(err){
+  console.error('LineGuide backup failed',err);
+  alert('The backup could not include every photograph: '+(err.message||'Storage error')+'. No incomplete backup was downloaded.');
+ }
 }
 function importData(openSingle=false){
  const input=document.createElement('input');input.type='file';input.accept='application/json,.json';
  input.onchange=async()=>{
-   const f=input.files?.[0];if(!f)return;
-   try{
-     if(f.size>25*1024*1024)throw Error('Backup file exceeds the 25 MB import limit');
-     const obj=JSON.parse(await f.text());
-     if(obj?.app!=='LineGuide'||obj?.version!==1)throw Error('Not a supported LineGuide backup');
-     const incoming=validateImport(obj.procedures),map=new Map(data.map(p=>[p.id,p]));
-     const matches=incoming.filter(p=>map.has(p.id)).length;
-     const photoCount=incoming.reduce((total,p)=>total+(p.steps||[]).filter(step=>!!step.photo).length,0);
-     if(!confirm(`Import ${incoming.length} prepared ${incoming.length===1?'procedure':'procedures'} with ${photoCount} embedded ${photoCount===1?'photograph':'photographs'}? ${matches} existing records with matching IDs will be replaced. Export a backup first.`))return;
-     for(let p of incoming)map.set(p.id,p);
-     const next=[...map.values()];if(persist(next)){const maxImported=Math.max(0,Number(obj.documentSequence)||0,...next.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported)))}catch{}if(openSingle&&incoming.length===1){currentId=incoming[0].id;currentRevisionIndex=null;nav('preview')}else nav('library')}
-   }catch(e){alert('Import cancelled: '+(e.message||'Invalid backup')+'. Your saved library is unchanged.')}
+  const file=input.files?.[0];if(!file)return;
+  try{
+   if(file.size>45*1024*1024)throw Error('Backup exceeds the 45 MB import limit.');
+   const obj=JSON.parse(await file.text());
+   if(obj?.app!=='LineGuide'||![1,2].includes(obj.version))throw Error('Not a supported LineGuide backup.');
+   const incoming=validateImport(obj.procedures);
+   const map=new Map(data.map(p=>[p.id,p]));
+   const matches=incoming.filter(p=>map.has(p.id)).length;
+   let photoCount=0;
+   for(const p of incoming)window.LineGuidePhotos.walk(p,step=>{if(step.photo)photoCount++});
+   if(!confirm('Import '+incoming.length+' prepared '+(incoming.length===1?'procedure':'procedures')+' containing '+photoCount+' attached '+(photoCount===1?'photograph':'photographs')+'? '+matches+' existing records with matching IDs will be replaced. Export a backup first.'))return;
+   // First validate and save every referenced photo, then and only then update
+   // localStorage metadata. This avoids broken references on partial imports.
+   const prepared=await window.LineGuidePhotos.prepareImport(incoming,obj.version,obj.images);
+   for(const p of prepared)map.set(p.id,p);
+   const next=[...map.values()];
+   if(persist(next)){
+    const maxImported=Math.max(0,Number(obj.documentSequence)||0,...next.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));
+    try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported)))}catch{}
+    if(openSingle&&prepared.length===1){currentId=prepared[0].id;currentRevisionIndex=null;nav('preview')}
+    else nav('library');
+   }
+  }catch(err){
+   console.error('LineGuide import failed',err);
+   alert('Import cancelled: '+(err.message||'Invalid backup')+'. Your saved library is unchanged.');
+  }
  };
  input.click();
 }
@@ -565,7 +589,14 @@ function act(a,pid,idx){
    }
    return;
  }
- if(a==='save-pdf'){window.LineGuidePdf.exportProcedurePdf();return}
+ if(a==='save-pdf'){
+  const record=data.find(p=>p.id===currentId);
+  const view=currentRevisionIndex===null?record:record?.revisionHistory?.[currentRevisionIndex];
+  if(!view){alert('The selected procedure is unavailable.');return}
+  try{const pdfCopy={...view};delete pdfCopy.revisionHistory;window.LineGuidePdf.exportProcedurePdf(window.LineGuidePhotos.materializeCached(pdfCopy))}
+  catch(err){alert('PDF export unavailable: '+err.message)}
+  return;
+ }
  if(a==='print-browser'){window.LineGuidePdf.browserPrint();return}
  if(a==='raw-recovery'){downloadRaw();return}
  if(a==='export'){exportData();return}
@@ -581,6 +612,7 @@ function render(){
  if(page==='builder')app.innerHTML=builder();
  if(page==='detail')app.innerHTML=detail();
  if(page==='preview')app.innerHTML=preview();
+ window.LineGuidePhotos.attach(app);
  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
  wire();
 }
@@ -600,7 +632,30 @@ function wire(){
  const sf=$('#statusFilter');if(sf){sf.value=filterStatus;sf.addEventListener('change',()=>{filterStatus=sf.value;render()})}
  if(page==='builder')wireBuilder();
 }
-load();if(location.hash.startsWith('#procedure=')){try{currentId=decodeURIComponent(location.hash.slice(11));page='detail'}catch{page='home'}}render();
+async function initialisePhotoStorage(){
+ load();
+ if(loadProblem){render();return}
+ try{
+  if(window.LineGuidePhotos.hasInline(data)){
+   const migrated=await window.LineGuidePhotos.convertProcedures(data);
+   if(!persist(migrated))throw new Error('Photo migration could not save the updated procedure references.');
+  }
+  // Older unfinished drafts can also contain repeated inline images.
+  const unfinished=storedDraft();
+  if(unfinished&&window.LineGuidePhotos.hasInline([{steps:unfinished.stepDrafts||[]}])){
+   const converted=await window.LineGuidePhotos.convertProcedures([{steps:unfinished.stepDrafts||[]}]);
+   unfinished.stepDrafts=converted[0].steps;
+   localStorage.setItem(DRAFT_KEY,JSON.stringify(unfinished));
+  }
+ }catch(err){
+  console.error('LineGuide photo migration failed',err);
+  alert('Photograph migration could not finish: '+(err.message||'Storage unavailable')+'. Your original records have not been erased. Export a backup and check browser storage.');
+ }
+ if(location.hash.startsWith('#procedure=')){try{currentId=decodeURIComponent(location.hash.slice(11));page='detail'}catch{page='home'}}
+ render();
+}
+$('#app').innerHTML='<section class="panel"><h2>Opening LineGuide</h2><p>Checking and preserving your procedure photographs…</p></section>';
+initialisePhotoStorage();
 function updateConnection(){let el=$('#connectionBadge');if(el)el.textContent=navigator.onLine?'● Online':'● Offline'}window.addEventListener('online',updateConnection);window.addEventListener('offline',updateConnection);updateConnection();
 if('serviceWorker'in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 

@@ -146,8 +146,8 @@ function makePdf(p,archived=false){
 function currentProcedure(){const base=data.find(x=>x.id===currentId);if(!base)return null;return currentRevisionIndex!==null?(base.revisionHistory||[])[currentRevisionIndex]:base}
 function filename(p){const slug=(p.documentNumber||p.title||'procedure').replace(/[^a-z0-9-]/gi,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(0,65);return `LineGuide-${slug}-Rev-${String(p.revision||'1.0').replace(/[^0-9.]/g,'')}.pdf`}
 function triggerDownload(file){const url=URL.createObjectURL(file);const link=document.createElement('a');link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
-function exportProcedurePdf(){
- const p=currentProcedure();if(!p){alert('The selected procedure is no longer available.');return}
+function exportProcedurePdf(preloadedProcedure=null){
+ const p=preloadedProcedure||currentProcedure();if(!p){alert('The selected procedure is no longer available.');return}
  try{
   const blob=makePdf(p,currentRevisionIndex!==null),file=new File([blob],filename(p),{type:'application/pdf'});
   // iPhone web-apps can silently ignore window.print(); native sharing lets users Save to Files, Print or send PDF.

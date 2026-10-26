@@ -1,5 +1,14 @@
 # LineGuide changelog
 
+## v3.0 — IndexedDB shared photo library (26 October 2026)
+- Deduplicated immutable photographs across all procedure revisions using SHA-256 references.
+- Lazy rendering of step photographs for current and archived revisions.
+- Photo upload stores compressed JPEG data directly in IndexedDB, rather than embedding it repeatedly in each procedure record.
+- Safe best-effort migration of older localStorage images; local records are only updated after image writes succeed.
+- Complete deduplicated JSON v2 backup and import, with v1 import compatibility and checksum verification.
+- Synchronous iPhone PDF share after photo preload; missing images prevent incomplete exports.
+- Chromium and WebKit regression coverage for migration, revision image retention, export and backup restore.
+
 ## v2.9 — Generic creator and ready-to-review documents
 
 - Removed all special palletiser authoring features, fixed five-activity list, dedicated Start Palletiser test button, source-only coverage gate, and document-specific software warnings.
