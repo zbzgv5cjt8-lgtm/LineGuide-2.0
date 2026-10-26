@@ -521,26 +521,50 @@ function preview(){
  <section class="docsection doccontrol"><h2>Document control</h2><div class="doccontrolgrid">${[['Author',p.owner],['Reviewer',p.reviewer],['Approver',p.approver],['Revision',revLabel(p.revision)],['Last updated',safeDate(p.updated)],['Change summary',p.changeNote]].filter(([,v])=>nonempty(v)).map(([k,v])=>`<div><small>${esc(k)}</small><strong>${esc(v)}</strong></div>`).join('')}</div>${p.status==='Approved'?`<p class="small">Approval recorded: ${esc(p.approvedBy||p.approver||'Not recorded')}${p.approvedAt?' · '+safeDate(p.approvedAt):''}. Prototype names are not authenticated signatures.</p>`:''}</section>
  <div class="docend">LineGuide · ${esc(documentNumber)} · Rev ${revLabel(p.revision)} · ${esc(p.status||'Draft')}</div></article>`;
 }
-function exportData(){
- const blob=new Blob([JSON.stringify({app:'LineGuide',version:1,exported:new Date().toISOString(),documentSequence:Number(localStorage.getItem(SEQUENCE_KEY))||0,procedures:data},null,2)],{type:'application/json'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);
- a.download='lineguide-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+async function exportData(){
+ try{
+  const pack=await window.LineGuidePhotos.backup(data);
+  const payload={app:'LineGuide',version:2,exported:new Date().toISOString(),
+    documentSequence:Number(localStorage.getItem(SEQUENCE_KEY))||0,
+    procedures:pack.procedures,images:pack.images};
+  const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='lineguide-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+ }catch(err){
+  console.error('LineGuide backup failed',err);
+  alert('The backup could not include every photograph: '+(err.message||'Storage error')+'. No incomplete backup was downloaded.');
+ }
 }
 function importData(openSingle=false){
  const input=document.createElement('input');input.type='file';input.accept='application/json,.json';
  input.onchange=async()=>{
-   const f=input.files?.[0];if(!f)return;
-   try{
-     if(f.size>25*1024*1024)throw Error('Backup file exceeds the 25 MB import limit');
-     const obj=JSON.parse(await f.text());
-     if(obj?.app!=='LineGuide'||obj?.version!==1)throw Error('Not a supported LineGuide backup');
-     const incoming=validateImport(obj.procedures),map=new Map(data.map(p=>[p.id,p]));
-     const matches=incoming.filter(p=>map.has(p.id)).length;
-     const photoCount=incoming.reduce((total,p)=>total+(p.steps||[]).filter(step=>!!step.photo).length,0);
-     if(!confirm(`Import ${incoming.length} prepared ${incoming.length===1?'procedure':'procedures'} with ${photoCount} embedded ${photoCount===1?'photograph':'photographs'}? ${matches} existing records with matching IDs will be replaced. Export a backup first.`))return;
-     for(let p of incoming)map.set(p.id,p);
-     const next=[...map.values()];if(persist(next)){const maxImported=Math.max(0,Number(obj.documentSequence)||0,...next.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported)))}catch{}if(openSingle&&incoming.length===1){currentId=incoming[0].id;currentRevisionIndex=null;nav('preview')}else nav('library')}
-   }catch(e){alert('Import cancelled: '+(e.message||'Invalid backup')+'. Your saved library is unchanged.')}
+  const file=input.files?.[0];if(!file)return;
+  try{
+   if(file.size>45*1024*1024)throw Error('Backup exceeds the 45 MB import limit.');
+   const obj=JSON.parse(await file.text());
+   if(obj?.app!=='LineGuide'||![1,2].includes(obj.version))throw Error('Not a supported LineGuide backup.');
+   const incoming=validateImport(obj.procedures);
+   const map=new Map(data.map(p=>[p.id,p]));
+   const matches=incoming.filter(p=>map.has(p.id)).length;
+   let photoCount=0;
+   for(const p of incoming)window.LineGuidePhotos.walk(p,step=>{if(step.photo)photoCount++});
+   if(!confirm('Import '+incoming.length+' prepared '+(incoming.length===1?'procedure':'procedures')+' containing '+photoCount+' attached '+(photoCount===1?'photograph':'photographs')+'? '+matches+' existing records with matching IDs will be replaced. Export a backup first.'))return;
+   // First validate and save every referenced photo, then and only then update
+   // localStorage metadata. This avoids broken references on partial imports.
+   const prepared=await window.LineGuidePhotos.prepareImport(incoming,obj.version,obj.images);
+   for(const p of prepared)map.set(p.id,p);
+   const next=[...map.values()];
+   if(persist(next)){
+    const maxImported=Math.max(0,Number(obj.documentSequence)||0,...next.map(p=>Number((p.documentNumber||'').match(/^LG-(?:SOP|SWP)-(\d+)$/)?.[1]||0)));
+    try{localStorage.setItem(SEQUENCE_KEY,String(Math.max(Number(localStorage.getItem(SEQUENCE_KEY))||0,maxImported))}catch{}
+    if(openSingle&&prepared.length===1){currentId=prepared[0].id;currentRevisionIndex=null;nav('preview')}
+    else nav('library');
+   }
+  }catch(err){
+   console.error('LineGuide import failed',err);
+   alert('Import cancelled: '+(err.message||'Invalid backup')+'. Your saved library is unchanged.');
+  }
  };
  input.click();
 }
