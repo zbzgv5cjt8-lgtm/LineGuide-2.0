@@ -789,7 +789,7 @@ def test_prepared_photo_import_remains_visible_in_pdf_and_revision(app):
  assert pg.locator('.docphoto').count()==2
  assert pg.locator('.docphoto').evaluate_all('els=>els.every(e=>e.complete&&e.naturalWidth>0)')
  assert len([s for s in getdata(pg)[0]['steps'] if s.get('photo')])==2
- assert any('2 embedded photographs' in msg for msg in dialogs)
+ assert any('2 attached photographs' in msg for msg in dialogs)
  with pg.expect_download() as info:pg.locator('[data-action=save-pdf]').click()
  pdf=fitz.open(info.value.path())
  assert sum(len(pdf.get_page_images(i)) for i in range(len(pdf)))==2
