@@ -802,7 +802,8 @@ def test_imported_legacy_swp_is_read_only_and_not_converted(app):
  pg.locator('.docpreview').wait_for()
  assert 'RA-OLD-001' in pg.locator('.docpreview').inner_text()
  pg.locator('[data-action=open]').click()
- pg.locator('[data-action=edit]').click()
+ assert pg.locator('[data-action=edit]').count()==0
+ pg.evaluate('() => act("edit","legacy-swp-record")')
  assert pg.locator('.docpreview').count()==0
  assert pg.locator('[data-stage]').count()==0
  assert any('older SWP' in msg for msg in dialogs)
