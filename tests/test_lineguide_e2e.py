@@ -28,15 +28,19 @@ def browser():
   b.close()
 
 @pytest.fixture
-def app(browser):
+def app(browser,server):
  ctx=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,accept_downloads=True)
- page=ctx.new_page();page.set_default_timeout(6000)
+ page=ctx.new_page();page.set_default_timeout(10000)
+ page.goto(server+'tests/blank.html')
  errors=[];dialogs=[]
  page.on('pageerror',lambda e: errors.append(str(e)))
  page.on('dialog',lambda d: (dialogs.append(d.message),d.accept()))
- html=(ROOT/'index.html').read_text().replace('<script src="app.js"></script>','')
+ html=(ROOT/'index.html').read_text()
+ for tag in ['<script src="photo-store.js"></script>','<script src="app.js"></script>','<script src="pdf-export.js"></script>']:
+  html=html.replace(tag,'')
  page.set_content(html)
  page.evaluate("""() => {const store={};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setItem:(k,v)=>{store[k]=String(v)},removeItem:k=>delete store[k]}})}""")
+ page.add_script_tag(content=(ROOT/'photo-store.js').read_text())
  page.add_script_tag(content=(ROOT/'app.js').read_text())
  page.add_script_tag(content=(ROOT/'pdf-export.js').read_text())
  yield page,ctx,errors,dialogs
@@ -234,7 +238,7 @@ def test_export_and_backups(app):
  pg.locator('[data-page=library]').click()
  with pg.expect_download() as download: pg.locator('[data-action=export]').click()
  backup=json.loads(download.value.path().read_text())
- assert backup['app']=='LineGuide' and len(backup['procedures'])==1
+ assert backup['app']=='LineGuide' and backup['version']==2 and len(backup['procedures'])==1
  assert not errors
 
 @pytest.mark.group2
@@ -276,8 +280,12 @@ def test_unsaved_builder_recovered_on_new_session(app):
  assert 'Interrupt recovery test' in stored
  # Simulate reopening the application in a fresh JS context with saved browser storage.
  second=ctx.new_page()
- second.set_content((ROOT/'index.html').read_text().replace('<script src="app.js"></script>',''))
+ second.goto(pg.url)
+ html=(ROOT/'index.html').read_text()
+ for tag in ['<script src="photo-store.js"></script>','<script src="app.js"></script>','<script src="pdf-export.js"></script>']:html=html.replace(tag,'')
+ second.set_content(html)
  second.evaluate('''storage=>{const store={'lineguide-wizard-draft-v1':storage};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>Object.prototype.hasOwnProperty.call(store,k)?store[k]:null,setItem:(k,v)=>store[k]=String(v),removeItem:k=>delete store[k]}})}''',stored)
+ second.add_script_tag(content=(ROOT/'photo-store.js').read_text())
  second.add_script_tag(content=(ROOT/'app.js').read_text())
  assert second.locator('[data-action=resume-draft]').is_visible()
  second.locator('[data-action=resume-draft]').click()
@@ -462,11 +470,15 @@ def test_import_malformed_json_keeps_records(app):
  assert not errors
 
 @pytest.mark.group4
-def test_damaged_local_data_is_not_overwritten(browser):
+def test_damaged_local_data_is_not_overwritten(browser,server):
  ctx=browser.new_context(viewport={'width':390,'height':844});pg=ctx.new_page()
- pg.set_content((ROOT/'index.html').read_text().replace('<script src="app.js"></script>',''))
+ pg.goto(server+'tests/blank.html')
+ html=(ROOT/'index.html').read_text()
+ for tag in ['<script src="photo-store.js"></script>','<script src="app.js"></script>','<script src="pdf-export.js"></script>']:html=html.replace(tag,'')
+ pg.set_content(html)
  pg.evaluate("""()=>{const m={'lineguide-procedures-v1':'{BROKEN'};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>m[k]??null,setItem:(k,v)=>m[k]=String(v),removeItem:k=>delete m[k]}})}""")
  errors=[];pg.on('pageerror',lambda e:errors.append(str(e)))
+ pg.add_script_tag(content=(ROOT/'photo-store.js').read_text())
  pg.add_script_tag(content=(ROOT/'app.js').read_text())
  assert pg.get_by_text('Stored data needs attention').count()==1
  assert pg.evaluate("localStorage.getItem('lineguide-procedures-v1')")=="{BROKEN"
@@ -494,7 +506,9 @@ def test_large_camera_photo_is_accepted_after_compression(app):
  pg.locator('[data-step=photoFile]').set_input_files({'name':'large_camera.png','mimeType':'image/png','buffer':buf.getvalue()})
  pg.locator('.stepbox img.photo').wait_for(timeout=15000)
  photo=pg.locator('[data-step=photo]').input_value()
- assert photo.startswith('data:image/jpeg;base64,') and len(photo)<950000
+ assert photo.startswith('idb:sha256:') and len(photo)==75
+ stored=pg.evaluate('(ref)=>window.LineGuidePhotos.get(ref)',photo)
+ assert stored.startswith('data:image/jpeg;base64,') and len(stored)<950000
  assert not errors
 
 
