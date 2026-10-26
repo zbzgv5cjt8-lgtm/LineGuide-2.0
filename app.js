@@ -593,7 +593,7 @@ function act(a,pid,idx){
   const record=data.find(p=>p.id===currentId);
   const view=currentRevisionIndex===null?record:record?.revisionHistory?.[currentRevisionIndex];
   if(!view){alert('The selected procedure is unavailable.');return}
-  try{window.LineGuidePdf.exportProcedurePdf(window.LineGuidePhotos.materializeCached(view))}
+  try{const pdfCopy={...view};delete pdfCopy.revisionHistory;window.LineGuidePdf.exportProcedurePdf(window.LineGuidePhotos.materializeCached(pdfCopy))}
   catch(err){alert('PDF export unavailable: '+err.message)}
   return;
  }
