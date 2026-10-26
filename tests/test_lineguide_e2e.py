@@ -335,7 +335,8 @@ def test_custom_options_and_photo_print(app):
  assert pg.locator('.docpreview img.docphoto').count()==1
  p=next(x for x in getdata(pg) if x['title']=='Photo and custom option test')
  assert p['taskType']=='Custom verification'
- assert p['steps'][0]['photo'].startswith('data:image/jpeg;base64,')
+ assert p['steps'][0]['photo'].startswith('idb:sha256:')
+ assert pg.locator('.docpreview img.docphoto').evaluate('img=>img.complete&&img.naturalWidth>0')
  assert len(pg.pdf(format='A4',print_background=True))>6000
  assert not errors
 
