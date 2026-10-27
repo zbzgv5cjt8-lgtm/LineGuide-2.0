@@ -1,4 +1,13 @@
-# LineGuide v3.1 — Simple SOP Creator
+# LineGuide v3.2 — Simpler SOP Guided Creator
+
+The guided SOP creator has been streamlined following engineering feedback:
+
+- **Identify:** Added **PPM** (planned preventative maintenance) to Task type.
+- **Safety and preparation:** Removed the stand-alone **Guards and protective devices** input. Safety-critical guard handling, isolations and reinstatement checks should still be documented in task-specific instructions, precautions and approved references.
+- **Instructions:** Removed the **Activity / section**, **Verification approach** and **Verification details** inputs. Each step now focuses on the action, expected result, optional warning and photograph.
+- **Completion:** Added a quick-select dropdown for common acceptance and sign-off requirements (operator, line leader, maintenance supervisor, PPM recorded, functional test, equipment handback, work order closed and work area safe). Each chosen item is added to an editable completion-criteria box without erasing existing text; users can add multiple selections or their own wording.
+- **Existing documents:** Historical section headings, guard references and verification notes are retained in saved records, older revisions, backup exports and existing document previews. Hidden fields are not silently destroyed by SOP revisions. The simplified inputs apply to new SOP authoring.
+- **Security and safety:** Selecting a sign-off requirement is not evidence that a person actually approved or signed the work. Existing site approvals and controlled safe systems are still required.
 
 LineGuide creates **Standard Operating Procedures (SOPs) only**. The single guided flow covers identification, task-specific safety and preparation, numbered instructions with photographs, and document review. It does not offer SWP creation or a risk-assessment authoring wizard.
 
@@ -18,7 +27,7 @@ LineGuide remains a **general-purpose, local-first SOP creator**. It has no equi
 ## First-upgrade checklist
 
 1. **Before upgrading, export an existing JSON backup** using the old app if you have procedures stored locally.
-2. Open v3.1 and allow the migration screen to complete. Do not clear Safari data or uninstall the app during migration.
+2. Open v3.2 and allow the photo-storage check to complete. Do not clear Safari data or uninstall the app during migration.
 3. Open a procedure with images and check the photo count, preview, and Save / Share PDF.
 4. Open an archived revision and verify its images.
 5. Export a **new full v2 backup**, which can restore the images and revision history on another supported browser.
@@ -40,8 +49,8 @@ LineGuide is a general-purpose, local-first SOP creator and document library. Th
 **Create a new SOP:**
 1. Home → **Create SOP**.
 2. Follow Identify → Safety & preparation → Instructions → Review.
-3. Use short dropdowns with Other entries, task-dependent isolation and an optional approved risk assessment reference, and numbered steps.
-4. Optional **Activity / section** helps group any longer SOP, with re-usable choices from that document. Optional source-page and photo fields work with any source reference.
+3. Use short dropdowns (including PPM), task-dependent isolation, an optional approved risk assessment reference, numbered instructions and quick-select completion checks.
+4. Individual instructions consist of an action, expected result and optional warning or photograph. Existing imported documents may retain historical section headings.
 5. Save and access through Home → Library or Browse (site → line → asset → task); export professional PDF, retain revisions and take JSON backups.
 
 The Library also offers **Import procedures** for merging multiple backed-up records. Import and export act on device-local data; the repository does not contain procedures.

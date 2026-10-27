@@ -6,13 +6,22 @@ const statuses=['Draft','In review','Approved'];
 const TEMPLATES=['Standard operating procedure (SOP)','Safe working procedure (SWP)'];
 const LEGACY_TEMPLATES=['Work instruction','Inspection procedure'];
 // Curated, short option lists. Machine-specific details must come from approved instructions.
-const TASK_TYPES=['Operation / changeover','Inspection','Cleaning','Adjustment','Repair / replacement','Testing / verification'];
+const TASK_TYPES=['Operation / changeover','PPM','Inspection','Cleaning','Adjustment','Repair / replacement','Testing / verification'];
+const COMPLETION_CHOICES=[
+ 'Sign-off by line leader required',
+ 'Sign-off by operator required',
+ 'Sign-off by maintenance supervisor required',
+ 'Functional test completed to approved criteria',
+ 'Equipment handed back to production',
+ 'PPM checklist completed and recorded',
+ 'Maintenance work order updated / closed',
+ 'Work area checked and left safe'
+];
 const AUDIENCES=['Maintenance engineers','Operators','Supervisors','Contractors'];
 const PPE_CHOICES=['Safety footwear','Eye protection','Hearing protection','Gloves','Protective clothing','Respiratory protection'];
 const PREREQ_CHOICES=['Competence / training','Authorisation / permit','Risk assessment','OEM / approved procedure','Isolation / safe state'];
 const HAZARD_CHOICES=['Electrical','Moving parts / entrapment','Pneumatic / hydraulic','Stored energy / suspended loads','Hot surfaces','Sharp edges / surfaces','Chemicals / dust','Slips / trips / falls','Noise'];
 const STEP_TYPES=['Action / instruction','Inspection / check','Adjustment / test','Record / handover'];
-const VERIFY_METHODS=['Visual check','Measurement to approved limits','Functional test','Record / sign-off'];
 const LEGACY_OTHER=['Other / site-specific','Other — specify below','Other'];
 const MULTI_FIELDS=['hazards','ppeItems','prerequisiteTypes'];
 const ISOLATION_MODES=['required','not-required','other'];
@@ -249,23 +258,29 @@ function leaveBuilder(){if(page!=='builder'||!builderDirty)return true;
 }
 function empty(t){return `<div class="empty">${esc(t)}</div>`}
 function itemCard(p){return `<div class="item"><div class="itemtop"><div><div class="itemtitle">${esc(p.title)}</div><div class="crumb">${crumb(p)}</div><div class="small">${esc(p.documentNumber||'Legacy reference')} · Rev ${revLabel(p.revision)}</div></div>${badge(p.status)}</div><div class="actions"><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open</button>${p.templateType===TEMPLATES[0]?`<button class="btn ghost" data-action="edit" data-id="${esc(p.id)}">Edit</button>`:'<span class="small">Legacy document · read only</span>'}<button class="btn danger" data-action="delete" data-id="${esc(p.id)}" aria-label="Delete ${esc(p.title)}">Delete</button></div></div>`}
-function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">ENGINEERING PROCEDURE LIBRARY</div><h1>Clear procedures.<br>Consistent documents.</h1><p class="muted">Create clear, consistent SOPs with simple guided questions. Older saved documents remain available for reference. You can also open a completed draft prepared for you.</p>${storedDraft()?'<div class="notice"><strong>Unfinished procedure saved on this device.</strong><div class="actions" style="margin-top:10px"><button class="btn green" data-action="resume-draft">Resume</button><button class="btn ghost" data-action="discard-draft">Discard</button></div></div>':''}<div class="actions"><button class="btn green" data-action="new">＋ Create SOP</button><button class="btn secondary" data-action="import-prepared">Import a prepared procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. You can import a prepared draft or create one yourself.')}</section><section class="panel"><h3>Focused engineering document control</h3><div class="pillrow"><span class="pill">SOP and SWP</span><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">PDF export</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">LineGuide v3.1 · Create SOPs with guided questions. Images are stored once across revisions. Documents remain local to this device; export backups regularly.</p></section>`}
+function home(){let approved=data.filter(p=>p.status==='Approved').length;return `<section class="welcome"><div class="eyebrow">ENGINEERING PROCEDURE LIBRARY</div><h1>Clear procedures.<br>Consistent documents.</h1><p class="muted">Create clear, consistent SOPs with simple guided questions. Older saved documents remain available for reference. You can also open a completed draft prepared for you.</p>${storedDraft()?'<div class="notice"><strong>Unfinished procedure saved on this device.</strong><div class="actions" style="margin-top:10px"><button class="btn green" data-action="resume-draft">Resume</button><button class="btn ghost" data-action="discard-draft">Discard</button></div></div>':''}<div class="actions"><button class="btn green" data-action="new">＋ Create SOP</button><button class="btn secondary" data-action="import-prepared">Import a prepared procedure</button><button class="btn secondary" data-action="library">⌕ Find a procedure</button></div></section><div class="grid three"><div class="stat"><strong>${data.length}</strong><span>Procedures</span></div><div class="stat"><strong>${approved}</strong><span>Approved documents</span></div><div class="stat"><strong>${new Set(data.map(p=>p.line).filter(Boolean)).size}</strong><span>Production lines</span></div></div><section class="panel" style="margin-top:14px"><h2>Recently updated</h2>${data.slice().sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,3).map(itemCard).join('')||empty('No procedures yet. You can import a prepared draft or create one yourself.')}</section><section class="panel"><h3>Focused engineering document control</h3><div class="pillrow"><span class="pill">SOP and SWP</span><span class="pill">Guided authoring</span><span class="pill">Photo steps</span><span class="pill">PDF export</span><span class="pill">Revision history</span><span class="pill">Named approvals</span></div><p class="small">LineGuide v3.2 · Create SOPs with guided questions. Images are stored once across revisions. Documents remain local to this device; export backups regularly.</p></section>`}
 function searchableText(p){return [p.title,p.site,p.line,p.asset,p.taskType,p.purpose,p.notes,p.documentNumber,...(p.hazards||[]),...(p.steps||[]).flatMap(s=>[s.section,s.sourcePage,s.action,s.expected,s.verify]),...(p.riskEntries||[]).flatMap(r=>[r.hazard,r.harm,r.controls])].join(' ').toLowerCase()}
 function library(){let arr=filteredProcedures().sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));return `<section class="welcome"><div class="eyebrow">PROCEDURE LIBRARY</div><h1>Find a procedure</h1><p class="muted">Search by task, asset, line, site or keyword.</p></section><input class="search" id="searchInput" placeholder="⌕  e.g. belt, Packing Line 04, sensor" value="${esc(searchTerm)}"><div class="toolbar"><select id="statusFilter" class="search"><option value="all">All document states</option><option>Draft</option><option>In review</option><option>Approved</option></select><button class="btn green" data-action="new">＋ Create SOP</button><button class="btn secondary" data-action="export">Export backup</button><button class="btn secondary" data-action="import">Import procedures</button></div><div id="libraryResults">${arr.map(itemCard).join('')||empty('No matching procedures. Try another search or create a procedure.')}</div>`}
 function browse(){let sites=[...new Set(data.map(p=>p.site).filter(Boolean))];return `<section class="welcome"><div class="eyebrow">ASSET HIERARCHY</div><h1>Browse by equipment</h1><p class="muted">Follow your site structure: site → line → asset → task.</p></section>${sites.map(site=>{let lines=[...new Set(data.filter(p=>p.site===site).map(p=>p.line))];return `<section class="panel"><h2>🏭 ${esc(site)}</h2>${lines.map(line=>{let assets=[...new Set(data.filter(p=>p.site===site&&p.line===line).map(p=>p.asset))];return `<div class="item"><h3>↳ ${esc(line||'Unassigned line')}</h3>${assets.map(asset=>`<div style="padding:8px 0 8px 12px;border-left:2px solid #dce3e8;margin:8px 0"><strong>⚙ ${esc(asset||'Unassigned asset')}</strong>${data.filter(p=>p.site===site&&p.line===line&&p.asset===asset).map(p=>`<div class="item" style="margin:8px 0 0"><div class="itemtitle">↳ ${esc(p.taskType||p.title)}</div><div class="crumb">${esc(p.title)}</div><button class="btn secondary" data-action="open" data-id="${esc(p.id)}">Open procedure</button></div>`).join('')}</div>`).join('')}</div>`}).join('')}</section>`}).join('')||empty('Create a procedure to start your asset library.')}`}
 function startBuilder(p=null){if(p&&p.templateType!==TEMPLATES[0]){alert('Older SWP records are kept for reference only. LineGuide now creates and revises SOPs only.');return}builderDirty=false;riskDrafts=p?jsoncopy(p.riskEntries||[]):[];editingId=p?.id||null;stepDrafts=p?JSON.parse(JSON.stringify(p.steps||[])):[];draftFields=p?JSON.parse(JSON.stringify(p)): {title:'',site:'',line:'',asset:'',templateType:'Standard operating procedure (SOP)',taskType:'Operation / changeover',audience:'Maintenance engineers',purpose:'',prerequisites:'',tools:'',hazards:[],ppeItems:[],prerequisiteTypes:[],ppe:'',isolation:'',isolationMode:'',isolationReason:'',guards:'',finalChecks:'',notes:'',owner:'',reviewer:'',approver:'',status:'Draft',riskAssessmentMode:'existing',riskAssessmentRef:'',riskControls:'',riskEntries:[],changeNote:'Initial issue'};if(p&&p.status!=='Draft')draftFields.status='Draft';wizardStep=1;page='builder';render();scrollWizardTop()}
+function completionSelector(value=''){
+ return `<div class="field"><label for="completionPreset">Quick add a completion requirement</label>
+ <select id="completionPreset" data-completion-preset aria-label="Quick add a completion requirement">
+ <option value="">Choose a common completion check…</option>
+ ${COMPLETION_CHOICES.map(option=>`<option value="${esc(option)}">${esc(option)}</option>`).join('')}
+ <option value="__custom__">Other — enter your own below</option>
+ </select><div class="small">Choose one or more checks; each selection is added to the criteria below. You can edit the wording.</div></div>
+ <div class="field"><label for="finalChecks">Completion / acceptance criteria *</label>
+ <textarea id="finalChecks" name="finalChecks" required placeholder="Choose above or describe how the task is accepted and signed off.">${esc(value)}</textarea></div>`;
+}
 function stepEditor(s={},i){
  const expanded=!s.action?.trim()||i===stepDrafts.length-1;
- const sections=[...new Set(stepDrafts.map(x=>x.section).filter(x=>typeof x==='string'&&x.trim()))].slice(0,6);
  return `<details class="stepbox" data-step-index="${i}" ${expanded?'open':''}>
- <summary class="stephead"><div class="stepnum">${i+1}</div><strong>${esc(s.section||'Instruction step '+(i+1))}</strong>${s.action?`<span class="small step-summary">${esc(s.action.slice(0,100))}</span>`:''}</summary>
+ <summary class="stephead"><div class="stepnum">${i+1}</div><strong>Instruction step ${i+1}</strong>${s.action?`<span class="small step-summary">${esc(s.action.slice(0,100))}</span>`:''}</summary>
  <button type="button" class="btn danger" style="margin:0 0 10px" data-action="remove-step" data-index="${i}">Remove step</button>
- ${stepChoice('section',s.section||'',sections,'Activity / section (optional)')}
  ${stepChoice('type',s.type||'',STEP_TYPES,'Step category')}
  <div class="field"><label>Action *</label><textarea data-step="action" required placeholder="Describe one clear action…">${esc(s.action||'')}</textarea></div>
  <div class="field"><label>Expected result *</label><textarea data-step="expected" required placeholder="What should be true when this step is complete?">${esc(s.expected||'')}</textarea></div>
- ${stepChoice('verifyMethod',s.verifyMethod||'',VERIFY_METHODS,'Verification approach')}
- <div class="field"><label>Verification details</label><textarea data-step="verify" placeholder="How is the expected result checked? Use approved criteria.">${esc(s.verify||'')}</textarea></div>
  <div class="field"><label>Warning / caution (if relevant)</label><textarea data-step="warning" placeholder="Task-specific warning from approved sources…">${esc(s.warning||'')}</textarea></div>
  <div class="field"><label>Photo / visual reference (optional)</label><input type="file" accept="image/*" data-step="photoFile"><input type="hidden" data-step="photo" value="${esc(s.photo||'')}">${s.photo?`<img class="photo" ${window.LineGuidePhotos.isRef(s.photo)?`data-photo-ref="${esc(s.photo)}"`:`src="${photosafe(s.photo)?esc(s.photo):''}"`} alt="Step photo"><button type="button" class="btn ghost" data-action="remove-photo" data-index="${i}">Remove photo</button>`:''}<div class="field"><label>Photo caption</label><input data-step="photoCaption" value="${esc(s.photoCaption||'')}" placeholder="Identify the control or screen shown"></div></div>
  <div class="field"><label>Reference document page (optional)</label><input data-step="sourcePage" value="${esc(s.sourcePage||'')}" placeholder="e.g. 3 or 4–5"></div>
@@ -290,9 +305,8 @@ ${riskAssessmentFields(d)}
 ${multiChoice('ppeItems',PPE_CHOICES,d.ppeItems||[],'PPE — select only what approved guidance requires')}
 <div class="field"><label>Additional PPE and work-area requirements</label><textarea name="ppe" placeholder="List equipment-specific PPE, permit conditions and other requirements from the approved assessment.">${esc(d.ppe||'')}</textarea></div>
 ${isolationChoice(d)}
-<div class="field"><label>Guards and protective devices</label><textarea name="guards" placeholder="What must be checked or verified according to the approved source?">${esc(d.guards||'')}</textarea></div>
 <div class="warning">Checkboxes are prompts, not a completed risk assessment. Do not select hazards or PPE by assumption. Use the relevant OEM/site documents and competent review.</div></div>
-<div class="${wizardStep===3?'':'hidden'}" data-stage="3"><h2>3. Build the instructions</h2><p class="muted">Each step should describe one clear action, its expected result and how the result is verified. Add photos where useful.</p><div id="stepsEditor">${stepDrafts.map(stepEditor).join('')}</div><div class="actions"><button type="button" class="btn secondary" data-action="add-step">＋ Add instruction step</button></div><div class="rule"></div><div class="field"><label>Completion / acceptance criteria *</label><textarea name="finalChecks" required placeholder="How is the task verified as complete? Include approved checks and release requirements.">${esc(d.finalChecks||'')}</textarea></div><div class="field"><label>Linked procedures / references</label><textarea name="notes" placeholder="Document numbers, OEM manuals, drawings or related procedures.">${esc(d.notes||'')}</textarea></div></div>
+<div class="${wizardStep===3?'':'hidden'}" data-stage="3"><h2>3. Build the instructions</h2><p class="muted">Record each action and its expected result. Add a warning or photograph only where useful.</p><div id="stepsEditor">${stepDrafts.map(stepEditor).join('')}</div><div class="actions"><button type="button" class="btn secondary" data-action="add-step">＋ Add instruction step</button></div><div class="rule"></div>${completionSelector(d.finalChecks||'')}<div class="field"><label>Linked procedures / references</label><textarea name="notes" placeholder="Document numbers, OEM manuals, drawings or related procedures.">${esc(d.notes||'')}</textarea></div></div>
 <div class="${wizardStep===4?'':'hidden'}" data-stage="4"><h2>4. Review and document control</h2>
 ${choiceMarkup('owner',d.owner||'',[...existingValues('owner'),...existingValues('reviewer'),...existingValues('approver')],'Author',true)}
 ${choiceMarkup('reviewer',d.reviewer||'',[...existingValues('owner'),...existingValues('reviewer'),...existingValues('approver')],'Reviewer')}
@@ -403,6 +417,19 @@ function wireBuilder(){
      if(isCustom)custom.focus();
      // Site → line → asset are dependent selections, including custom answers.
      if(field==='site'||field==='line')refreshHierarchyChildren(field);
+   }
+   if(el.matches('[data-completion-preset]')){
+     const criteria=f.querySelector('[name="finalChecks"]');
+     const chosen=el.value;
+     if(chosen==='__custom__')criteria.focus();
+     else if(chosen){
+       const entries=criteria.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+       if(!entries.some(x=>x.toLowerCase()===chosen.toLowerCase())){
+         criteria.value=[...entries,chosen].join('\n');
+         criteria.dispatchEvent(new Event('input',{bubbles:true}));
+       }
+     }
+     el.value='';
    }
    if(el.matches('[data-isolation-mode]'))updateIsolationVisibility();
       if(el.matches('[data-risk-people]')){const box=el.closest('[data-risk-index]'),input=box.querySelector('[data-risk="people"]'),custom=el.value==='Other — specify';input.classList.toggle('hidden',!custom);input.value=custom?'':el.value;input.required=custom;if(custom)input.focus()}
@@ -556,7 +583,7 @@ function act(a,pid,idx){
  if(a==='edit'){const p=data.find(x=>x.id===pid);if(p&&p.templateType!==TEMPLATES[0]){alert('This older SWP is retained for reference and PDF export only. SOP creation is available from Home.');return}if(!leaveBuilder())return;if(storedDraft()&&!confirm('Discard your unfinished procedure and edit this document?'))return;discardWorkingDraft();if(p)startBuilder(p);return}
  if(a==='add-risk'){captureSteps();captureForm();riskDrafts.push({hazard:'',harm:'',people:'',controls:'',actions:''});builderDirty=true;render();queueDraftSave();return}
  if(a==='remove-risk'){captureSteps();captureForm();riskDrafts.splice(Number(idx),1);builderDirty=true;render();queueDraftSave();return}
- if(a==='add-step'){captureSteps();captureForm();stepDrafts.push({action:'',expected:'',verify:'',warning:'',photo:'',section:stepDrafts.at(-1)?.section||''});builderDirty=true;render();queueDraftSave();return}
+ if(a==='add-step'){captureSteps();captureForm();stepDrafts.push({action:'',expected:'',warning:'',photo:''});builderDirty=true;render();queueDraftSave();return}
  if(a==='remove-step'){captureSteps();captureForm();stepDrafts.splice(Number(idx),1);builderDirty=true;render();queueDraftSave();return}
  if(a==='remove-photo'){captureSteps();captureForm();if(stepDrafts[Number(idx)])stepDrafts[Number(idx)].photo='';builderDirty=true;render();return}
  if(a==='preview'){currentId=pid;currentRevisionIndex=null;nav('preview');return}
