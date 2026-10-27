@@ -659,45 +659,57 @@ def test_no_equipment_specific_builder_or_content(app):
  assert not errors
 
 @pytest.mark.group5
-def test_general_section_grouping_short_choices_and_back_navigation(app):
+def test_streamlined_steps_ppm_and_back_navigation(app):
  pg,_,errors,_=app
  pg.locator('[data-page=builder]').click()
- pg.locator('[name=title]').fill('Generic startup procedure')
+ assert 'PPM' in pg.locator('[data-choice=taskType] option').all_text_contents()
+ pg.locator('[name=title]').fill('Generic PPM procedure')
  for k,v in [('site','Any Site'),('line','Line A'),('asset','General asset')]:
   pg.locator('[data-choice='+k+']').select_option('__custom__')
   pg.locator('input[name='+k+']').fill(v)
- pg.locator('[name=purpose]').fill('A fictional generic procedure for app testing')
+ pg.locator('[data-choice=taskType]').select_option('PPM')
+ pg.locator('[name=purpose]').fill('A fictional PPM procedure for app testing')
  pg.locator('#nextBtn').click()
  pg.locator('[name=prerequisites]').fill('Authorised persons only')
  pg.locator('[data-isolation-mode]').select_option('not-required')
+ assert pg.locator('[name=guards]').count()==0
+ assert pg.get_by_text('Guards and protective devices',exact=True).count()==0
  pg.locator('#nextBtn').click()
  pg.locator('[data-action=add-step]').click()
- pg.locator('[data-step-choice=section]').select_option('__custom__')
- pg.locator('[data-step=section]').fill('Preparation')
+ assert pg.locator('[data-step-choice=section]').count()==0
+ assert pg.locator('[data-step=section]').count()==0
+ assert pg.locator('[data-step-choice=verifyMethod]').count()==0
+ assert pg.locator('[data-step=verify]').count()==0
  pg.locator('[data-step=action]').fill('Identify fictional prerequisites')
  pg.locator('[data-step=expected]').fill('Prerequisites identified')
  pg.locator('[data-step=sourcePage]').fill('A4')
  pg.locator('[data-action=add-step]').click()
- assert pg.locator('[data-step=section]').last.input_value()=='Preparation'
- pg.locator('[data-step=action]').last.fill('Complete fictional preparation')
- pg.locator('[data-step=expected]').last.fill('Preparation complete')
+ pg.locator('[data-step=action]').last.fill('Complete fictional PPM checks')
+ pg.locator('[data-step=expected]').last.fill('PPM checks completed')
  assert pg.locator('details[data-step-index]').count()==2
- pg.locator('[name=finalChecks]').fill('Complete against fictional requirements')
+ pg.locator('[data-completion-preset]').select_option('PPM checklist completed and recorded')
+ pg.locator('#backBtn').click()
+ pg.locator('#nextBtn').click()
+ assert pg.locator('[name=finalChecks]').input_value()=='PPM checklist completed and recorded'
  pg.locator('#nextBtn').click()
  pg.locator('[data-choice=owner]').select_option('__custom__')
  pg.locator('input[name=owner]').fill('Sample writer')
  pg.locator('#nextBtn').click()
  doc=getdata(pg)[0]
- assert [st['section'] for st in doc['steps']]==['Preparation','Preparation']
+ assert doc['taskType']=='PPM'
+ assert 'section' not in doc['steps'][0]
+ assert 'verifyMethod' not in doc['steps'][0]
+ assert 'verify' not in doc['steps'][0]
  assert doc['steps'][0]['sourcePage']=='A4'
- assert pg.locator('.docactivity').count()==1
+ assert doc['finalChecks']=='PPM checklist completed and recorded'
+ assert pg.locator('.docactivity').count()==0
  assert not errors
 
 @pytest.mark.group5
 def test_unsectioned_procedure_remains_usable(app):
  pg,_,errors,_=app
  p=prepare_one(pg,'Generic unsectioned SOP')
- assert p['steps'][0]['section']==''
+ assert p['steps'][0].get('section','')==''
  assert pg.locator('.docactivity').count()==0
  assert 'Generic unsectioned SOP' in pg.locator('.docpreview').inner_text()
  assert not errors
@@ -911,4 +923,92 @@ def test_incomplete_version2_image_manifest_rejected_without_overwriting(app):
   pg.wait_for_timeout(100)
  assert getdata(pg)==before
  assert any('missing a photograph' in msg for msg in dialogs)
+ assert not errors
+
+
+@pytest.mark.group5
+def test_completion_quick_select_appends_and_preserves_custom_text(app):
+ pg,_,errors,_=app
+ pg.locator('[data-page=builder]').click()
+ pg.locator('[name=title]').fill('Fictional completion acceptance')
+ for k,v in [('site','Test Site'),('line','Line T'),('asset','Test asset')]:
+  pg.locator('[data-choice='+k+']').select_option('__custom__')
+  pg.locator('input[name='+k+']').fill(v)
+ pg.locator('[name=purpose]').fill('Verify how the completion dropdown behaves')
+ pg.locator('#nextBtn').click()
+ pg.locator('[name=prerequisites]').fill('Trained QA personnel only')
+ pg.locator('[data-isolation-mode]').select_option('not-required')
+ pg.locator('#nextBtn').click()
+ pg.locator('[data-action=add-step]').click()
+ pg.locator('[data-step=action]').fill('Conduct fictional functional check')
+ pg.locator('[data-step=expected]').fill('Fictional accepted result obtained')
+ preset=pg.locator('[data-completion-preset]')
+ criteria=pg.locator('[name=finalChecks]')
+ assert criteria.input_value()==''
+ preset.select_option('Sign-off by line leader required')
+ assert criteria.input_value()=='Sign-off by line leader required'
+ preset.select_option('PPM checklist completed and recorded')
+ assert criteria.input_value()=='Sign-off by line leader required\nPPM checklist completed and recorded'
+ preset.select_option('Sign-off by line leader required')
+ assert criteria.input_value().count('Sign-off by line leader required')==1
+ preset.select_option('__custom__')
+ assert criteria.input_value().endswith('PPM checklist completed and recorded')
+ criteria.fill(criteria.input_value()+'\nAdditional site-specific closeout check')
+ pg.locator('#nextBtn').click()
+ pg.locator('[data-choice=owner]').select_option('__custom__')
+ pg.locator('input[name=owner]').fill('QA Author')
+ pg.locator('#nextBtn').click()
+ saved=getdata(pg)[0]
+ assert saved['finalChecks'].splitlines()==[
+  'Sign-off by line leader required','PPM checklist completed and recorded',
+  'Additional site-specific closeout check'
+ ]
+ for entry in saved['finalChecks'].splitlines():
+  assert entry in pg.locator('.docpreview').inner_text()
+ with pg.expect_download() as info:
+  pg.locator('[data-action=save-pdf]').click()
+ pdf=fitz.open(info.value.path())
+ exported='\n'.join(page.get_text() for page in pdf)
+ assert 'Sign-off by line leader required' in exported
+ assert 'Additional site-specific closeout check' in exported
+ pg.locator('[data-action=open]').click()
+ pg.locator('[data-action=edit]').click()
+ pg.locator('#nextBtn').click()
+ pg.locator('#nextBtn').click()
+ assert pg.locator('[name=finalChecks]').input_value()==saved['finalChecks']
+ assert not errors
+
+@pytest.mark.group5
+def test_older_sop_steps_keep_historical_fields_without_reintroducing_editor_inputs(app):
+ pg,_,errors,_=app
+ doc={'id':'old-sop-fields','title':'Historical SOP with legacy details',
+ 'templateType':SOP,'site':'Any site','line':'Line 1','asset':'Machine',
+ 'purpose':'Legacy test','prerequisites':'Trained personnel','isolationMode':'not-required',
+ 'guards':'Machine-specific guard checks recorded in older revision',
+ 'finalChecks':'Prior acceptance wording retained from earlier SOP',
+ 'owner':'QA Author','status':'Draft','revision':'1.0',
+ 'steps':[{'section':'Start-up','action':'Old action','expected':'Old expected result',
+  'verifyMethod':'Functional test','verify':'Previous verification details'}]}
+ with pg.expect_file_chooser() as chooser:pg.locator('[data-action=import-prepared]').click()
+ chooser.value.set_files({'name':'legacy-sop.json','mimeType':'application/json',
+ 'buffer':json.dumps({'app':'LineGuide','version':1,'procedures':[doc]}).encode()})
+ pg.locator('.docpreview').wait_for()
+ assert 'Machine-specific guard checks recorded in older revision' in pg.locator('.docpreview').inner_text()
+ pg.locator('[data-action=open]').click()
+ pg.locator('[data-action=edit]').click()
+ pg.locator('#nextBtn').click()
+ assert pg.locator('[name=guards]').count()==0
+ pg.locator('#nextBtn').click()
+ assert pg.locator('[data-step=section]').count()==0
+ assert pg.locator('[data-step=verify]').count()==0
+ assert pg.locator('[data-step-choice=verifyMethod]').count()==0
+ assert pg.locator('[name=finalChecks]').input_value()=='Prior acceptance wording retained from earlier SOP'
+ pg.locator('#nextBtn').click()
+ pg.locator('[name=changeNote]').fill('Updated without altering historical reference values')
+ pg.locator('#nextBtn').click()
+ record=getdata(pg)[0]
+ assert len(record['revisionHistory'])==1
+ assert record['revisionHistory'][0]['steps'][0]['verify']=='Previous verification details'
+ assert record['revisionHistory'][0]['guards']=='Machine-specific guard checks recorded in older revision'
+ assert record['finalChecks']=='Prior acceptance wording retained from earlier SOP'
  assert not errors
