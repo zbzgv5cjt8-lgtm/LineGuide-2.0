@@ -1,5 +1,13 @@
 # LineGuide changelog
 
+## v3.2 — Simplified SOP creation (27 October 2026)
+- Added PPM to the task-type choices.
+- Removed the separate guard/protective-device prompt (without removing applicable machine safeguarding requirements).
+- Removed optional activity/section, verification approach and verification details from the instruction editor.
+- Added quick-select completion acceptance and sign-off text, with multiple additions and editable custom wording.
+- Preserved stored legacy fields, existing document rendering, revision history and shared IndexedDB photographs.
+- Added automated regression coverage for selection, removal, legacy retention, PDF export and back-navigation.
+
 ## v3.1 — SOP-only guided authoring (26 October 2026)
 - Removed the template picker; all newly created and revised documents are SOPs.
 - Removed the SWP-specific risk assessment method and hazard-by-hazard editor from the guided flow.
